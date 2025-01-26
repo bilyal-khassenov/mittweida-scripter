@@ -1,0 +1,59 @@
+{
+    "ui_settings": {
+        "corporate_design_color": "#0069B4",
+        "corporate_design_font": "Open Sans"
+    },
+    "email":{
+        "server": "PLACEHOLDER",
+        "port": 999999
+    },
+    "telegram":{
+        "use_telegram" : true,
+        "admin_chat_id": "PLACEHOLDER",
+        "bot_token": "PLACEHOLDER"
+    },
+    "features": {
+        "previously_transcribed_files_count": 1,
+        "previously_transcribed_seconds_count": 1
+    },
+    "texts": {
+        "general": {
+            "scripter_name": "Mittweida Scripter"
+        },
+        "page": {
+            "usage_overview": "Nutzungsübersicht",
+            "transcribed_files": "Transkribierte Dateien",
+            "total_duration": "Gesamtdauer der Transkriptionen (Stunden)",
+            "platform_heading": "Audio-To-Text-Plattform der Hochschule Mittweida",
+            "welcome_message": "<p class='no-fade'>Herzlich willkommen auf unserer <b>Transkriptions-Plattform der Hochschule Mittweida</b>! Hier bieten wir Ihnen die Möglichkeit, Audio- und Videodateien <b>DSGVO-konform</b>, <b>schnell</b> und exklusiv <b>auf den Servern der Hochschule Mittweida</b> mithilfe von <b>KI-Lösungen</b> transkribieren zu lassen.</p>",
+            "consent_text": "Ich stimme dem Datenschutzhinweis (befindet sich unten) zu und erkläre mich mit der Verarbeitung meiner E-Mail-Adresse zur Nutzung des ‚Mittweida Scripter‘ einverstanden",
+            "email_field_lable": "E-Mail-Adresse",
+            "domain_field_lable": "Domain",
+            "select_file": "Datei wählen",
+            "send_file": "Datei senden",
+            "how_it_works_header": "Anleitung: So funktioniert das Transkriptionstool ⚙️",
+            "how_it_works": "### So funktioniert das Transkriptionstool:\n\n1. Geben Sie Ihren **Benutzer*****innamen** ein\n2. Wählen Sie dann mit dem Button **'Browse Files'** die benötigte Audio- oder Videodatei aus\n3. Klicken Sie auf **'Datei senden'**, um die ausgewählte Datei zu übermitteln.\n4. Die Datei wird mithilfe des Open-Source-Transkriptionsmodels **Whisper Large v2** transkribiert. Nach Abschluss der Transkription erhalten Sie die **Ergebnisse per E-Mail**. Sowohl die **transkribierte Datei als auch die Ergebnisse** werden unmittelbar nach dem Abschluss des Transkriptionsvorgangs **vom Server gelöscht**, um maximalen **Datenschutz** zu gewährleisten.",
+            "data_privacy_note_lable": "Datenschutzhinweis",
+            "data_privacy_note": "Die bei Nutzung des ‚Mittweida Scripter‘ erfassten personenbezogenen Daten (E-Mail-Adresse) werden ausschließlich für das Transkribieren Ihrer eingegebenen Datei verwendet.\nZur Fehleranalyse der Software wird Ihre E-Mail-Adresse durch einen Hash-Wert pseudonymisiert, sodass ein direkter Personenbezug ausgeschlossen ist. Die Daten werden nicht an Dritte übermittelt.\nNach Wegfall des Verarbeitungszwecks werden die Daten sofort gelöscht. Anderenfalls richten sich die Löschfristen nach hochschulinternen bzw. den gesetzlichen Bestimmungen.\nDie Befugnis, grundsätzlich selbst über die Preisgabe und Verwendung der persönlichen Daten zu bestimmen, ist verfassungsrechtlich geschützt.\nIhre Angaben dürfen daher aus datenschutzrechtlichen Gründen nur verwendet werden, wenn Sie einwilligen. Die Rechtsgrundlage zur Verarbeitung dieser Daten ist Ihre Einwilligung gemäß Art. 6 Abs. 1 Buchstabe a) DS-GVO.\nDie Einwilligung steht Ihnen völlig frei und ist jederzeit mit Wirkung für die Zukunft widerruflich. Schreiben Sie dazu bitte eine E-Mail an datenschutz@hs-mittweida.de.\nDer Widerruf hat zur Folge, dass personenbezogene Daten nicht weiterverwendet werden dürfen und umgehend gelöscht werden. Eine Nutzung des ‚Mittweida Scripter‘ ist jedoch dann auch nicht möglich, weil Ihnen der transkribierte Text dann nicht zugesandt werden kann.\nDie Kontaktdaten des Verantwortlichen und des Datenschutzbeauftragten sind unter https://www.hs-mittweida.de/newsampservice/datenschutz.html hinterlegt.\nDie weiteren Betroffenenrechte im Sinne der DS-GVO sind ebenfalls dort zu finden.",
+            "error_username_not_provided": "Bitte fühlen Sie das Feld 'Benutzer*innamen' aus!",
+            "error_file_not_selected": "Bitte wählen Sie eine Datei aus, die Sie hochladen möchten!",
+            "upload_success_message_part_1" : "Ihre Datei wurde erfolgreich hochgeladen. Sobald die Audiospur dieser Datei erfolgreich transkribiert wurde, erhalten Sie die fertige Transkription der Datei per E-Mail an",
+            "error_email_in_username": "Bitte geben Sie eine gültige E-Mail-Adresse ein!",
+            "stats_expander_heading": "Nutzungsstatistiken 📈",
+            "unique_users_heading_label": "Unique Users",
+            "unique_users_value_label": "Benutzer*innen",
+            "hours_chart_heading": "Gesamtdauer der Transkriptionen (Stunden)",
+            "hours_chart_hours_wording": "Stunden",
+            "count_chart_heading": "Anzahl der Transkriptionen",
+            "count_chart_files_wording": "Dateien",
+            "top_ten_institutions_chart_heading": "Top 10 Institutionen"
+        },
+        "whisper":{
+            "docx_text_only_title": "Transkription - Nur Text",
+            "docx_color_legends_label": "Farbkennzeichnung der Transkriptionsgenauigkeit",
+            "docx_text_conversation_turns_title": "Transkription - Mit Sprecher:innen-Zuordnung",
+            "email_text": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie zwei Dateien: eine mit ausschließlich dem transkribierten Text und eine weitere, die den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln enthält.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
+            "email_subject": "Transkription"
+        }
+    }
+  }

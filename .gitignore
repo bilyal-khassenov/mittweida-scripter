@@ -1,0 +1,18 @@
+# General
+__pycache__/
+*.py[cod]
+config.json
+
+# Ignore everything in the .streamlit folder
+.streamlit/*
+
+# Allow the .gitignore file in the .streamlit folder
+!.streamlit/.gitignore
+
+# Ignore specific files in the resources folder
+resources/config.json
+resources/mws_page.service
+resources/mws_whisper.service
+
+#Ignore file for local tests
+code/tests.py
