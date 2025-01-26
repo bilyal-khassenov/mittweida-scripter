@@ -1,7 +1,10 @@
 #Import main packages
-import pathlib, os, sys, time, datetime, shutil
+import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper
 from mutagen.mp3 import MP3
 from docx.enum.text import WD_COLOR_INDEX
+from docx import Document
+from docx.shared import Pt
+######from docx.document import Document #Keep it for Intellisense!
 
 #Import helper functions
 import mws_helpers
@@ -17,7 +20,6 @@ dir_unprocessed = mws_helpers.ProjectPaths().unprocessed_folder_path
 configs = mws_helpers.get_configs()
 
 def diarize_file(file_path):
-    import torch
     from pyannote.audio import Pipeline
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
     #Check if CUDA is available and if it is, send pipeline to GPU
@@ -34,7 +36,7 @@ def diarize_file(file_path):
         # print(f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}")
     return speech_turns
 
-def diariaze_timestamped_words(conversation_turns, timestamped_words):
+def diarize_timestamped_words(conversation_turns, timestamped_words):
     for conversation_turn in conversation_turns:
         #First prepare list of all words marked as temporary acceptable or not for this speech turn
         for word in timestamped_words:
@@ -52,10 +54,6 @@ def diariaze_timestamped_words(conversation_turns, timestamped_words):
 
 def transcribe_file(current_file_location_fullname):
     try:
-        import pandas, whisper, torch
-        from docx import Document
-        from docx.shared import Pt
-        ######from docx.document import Document #Keep it for Intellisense!
 
         #Notification
         if configs['telegram']['use_telegram'] == True:
@@ -94,7 +92,7 @@ def transcribe_file(current_file_location_fullname):
         font.name = configs['ui_settings']['corporate_design_font']
         font.size = Pt(10)
         
-        #Define confidence levels up to
+        #Define confidence levels bounds
         high_confidence_level_lower_bound = -0.4
         average_confidence_level_lower_bound = -0.6
 
@@ -120,7 +118,6 @@ def transcribe_file(current_file_location_fullname):
             else:
                 return WD_COLOR_INDEX.RED
         #Add Text Segments in Loop
-        list_of_dicts = []  #FOR TESTING!!!!
         if "segments" in result:
             for segment in result["segments"]:
                 if "words" in segment:
@@ -128,14 +125,11 @@ def transcribe_file(current_file_location_fullname):
                     print(segment_confidency)
                     highlight_color = select_highlight_color(segment_confidency)
                     run_text = segment['text']
-                    list_of_dicts.append({'text':segment['text'], 'confidence': segment['avg_logprob']})    #FOR TESTING!!!!
                     current_run = text_paragraph.add_run(run_text)
                     # Set the highlight color
                     current_run.font.highlight_color = highlight_color
+        
         #Save file
-        df = pandas.DataFrame(list_of_dicts)                                #FOR TESTING!!!!
-        path_for_excel = r"C:\Users\bilya\Desktop\confidence_levels.xlsx"   #FOR TESTING!!!!
-        df.to_excel(path_for_excel, index=False)                            #FOR TESTING!!!!
         document_text_only.save(transcript_text_only_file_fullname)
 
         #Perform diarization
@@ -175,7 +169,7 @@ def transcribe_file(current_file_location_fullname):
                 timestamped_words.append({'word' : word['word'], 'start' : word['start'], 'end' : word['end']})
 
         #Assign words to conversation turns
-        completed_conversation_turns = diariaze_timestamped_words(normalized_and_diarized_turns, timestamped_words)
+        completed_conversation_turns = diarize_timestamped_words(normalized_and_diarized_turns, timestamped_words)
         
         #Save conversation turns to a Docx File
         def convert_secs_to_timestamp(seconds):
@@ -239,7 +233,7 @@ def transcribe_file(current_file_location_fullname):
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "File has been moved to the error folder")
 
-def find_new_uprocessed_files():
+def find_new_unprocessed_files():
     # Initialize counter variables and list for unprocessed files
     count_unprocessed = 0
     files_found_unprocessed = []
@@ -356,7 +350,7 @@ def main():
         #If there are less than 2 videos currently in progress, then check if there are any new uploaded files to start new transcription process
         if get_number_of_currently_processed_files() < 2:
             #Check if a new unprocessed file has been found, and if so, create a daemon process, that we will not be waiting for to end completely
-            check_result = find_new_uprocessed_files()
+            check_result = find_new_unprocessed_files()
             if not check_result is None:
                 another_daemon_process = Process(target=process_file, args=(check_result,))
                 another_daemon_process.daemon = True

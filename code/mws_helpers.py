@@ -18,11 +18,11 @@ class ProjectPaths:
         self.uploads_protocol_fullfilename = os.path.join(self.stats_path, 'protocol.csv')
         self.performance_protocol_fullfilename = os.path.join(self.stats_path, 'performance.csv')
 
-def get_acceptable_format_extenstions():
+def get_acceptable_format_extensions():
     return [
-        '.webm', '.mkv', '.flv', '.flv', '.vob', '.ogv', '.ogg', '.drc', '.avi', '.MTS', '.M2TS', '.TS',
+        '.webm', '.mkv', '.flv', '.vob', '.ogv', '.ogg', '.drc', '.avi', '.MTS', '.M2TS', '.TS',
         '.mov', '.qt', '.wmv', '.rm', '.rmvb', '.viv', '.asf', '.amv', '.mp4', '.m4p', '.m4v', '.mpg',
-        '.mp2', '.mpeg', '.mpe', '.mpv', '.mpg', '.mpeg', '.m2v', '.m4v', '.3gp', '.3g2', '.flv', '.f4v',
+        '.mp2', '.mpeg', '.mpe', '.mpv', '.mpg', '.m2v', '.m4v', '.3gp', '.3g2', '.f4v',
         '.f4p', '.f4a', '.f4b', '.3gp', '.aa', '.aac', '.aax', '.act', '.aiff', '.alac', '.amr', '.ape',
         '.au', '.awb', '.dss', '.dvf', '.flac', '.gsm', '.iklax', '.ivs', '.m4a', '.m4b', '.m4p', '.mmf',
         '.movpkg', '.mp3', '.mpc', '.msv', '.nmf', '.ogg', '.oga', '.mogg', '.opus', '.ra', '.rm', '.raw',

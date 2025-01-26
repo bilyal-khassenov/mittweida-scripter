@@ -164,7 +164,7 @@ def main():
         st.session_state.disabled = True
 
     #Get list of acceptable file formats
-    acceptable_formats = mws_helpers.get_acceptable_format_extenstions()
+    acceptable_formats = mws_helpers.get_acceptable_format_extensions()
 
     #Main form
     with st.form(key="Form :", clear_on_submit = False):
