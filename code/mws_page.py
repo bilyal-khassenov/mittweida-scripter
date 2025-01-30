@@ -181,17 +181,19 @@ def main():
         elif uploaded_file is None:
             st.error(texts_from_config_file['error_file_not_selected'], icon="🚨")
         elif re.compile(r'^\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b$').search(email_address_textbox):   #If it is a valid e-mail address
+            #Transliterate input file name
+            file_name_stem = unidecode(uploaded_file.name)
+            #Sanitize Filename
+            file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", file_name_stem)
             #Replace spaces with undescore charachter
             re_pattern_space_char = r'[^\w_.-]'
-            filename_no_spaces = re.sub(re_pattern_space_char, '_', pathlib.Path(dir_orig_files_temps, uploaded_file.name).stem)
-            #Transliterate file name
-            transliterated_text = unidecode(filename_no_spaces)
+            file_name_stem = re.sub(re_pattern_space_char, '_', file_name_stem)
             # Replace consecutive non-alphanumeric characters with a single underscore
-            transliterated_text = re.sub(r'[^a-zA-Z0-9]+', '_', transliterated_text)
+            file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', file_name_stem)
             # Remove leading and trailing underscores
-            transliterated_text = transliterated_text.strip('_')
+            file_name_stem = file_name_stem.strip('_')
             #Combine file name from compenents
-            new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{transliterated_text}"[0:68]
+            new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{file_name_stem}"[0:68]
 
             #Prepare initial path
             format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
