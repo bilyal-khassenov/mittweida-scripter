@@ -231,11 +231,11 @@ def main():
             #Check if protocol exists. If not, create it
             mws_helpers.make_sure_protocols_exist()
             #Read protocol
-            protocol = pd.read_csv(stats_protocol_file_path)
+            protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
             #Concatanate protocol records
             result = pd.concat([protocol, new_record_df])
             #Save new state of the protocol
-            result.to_csv(stats_protocol_file_path, index=False)
+            result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
             
             #Send notification to Admin to let him know a new file has been uploaded for Transcription
             if configs['telegram']['use_telegram'] == True:

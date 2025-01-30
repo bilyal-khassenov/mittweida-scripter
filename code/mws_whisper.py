@@ -11,7 +11,6 @@ import mws_helpers
 
 #Central paths definition
 new_line_for_f_strings = '\n'
-path_to_uploads_protocol = mws_helpers.ProjectPaths().uploads_protocol_fullfilename
 dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 dir_processed = mws_helpers.ProjectPaths().processed_folder_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
@@ -213,11 +212,11 @@ def transcribe_file(current_file_location_fullname):
         #Create a dataframe of this dictionary
         new_perf_record_df = pandas.DataFrame(new_perf_record)
         #Transform this line to a dataframe
-        perf_protocol = pandas.read_csv(path_to_perf_protocol)
+        perf_protocol = pandas.read_csv(path_to_perf_protocol, encoding='Windows-1252')
         #Concatanate both frames
         result = pandas.concat([perf_protocol, new_perf_record_df])
         #Save new state of the protocol
-        result.to_csv(path_to_perf_protocol, index=False)
+        result.to_csv(path_to_perf_protocol, encoding='Windows-1252', index=False)
         return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
     except Exception as e:
         #Get exception infos
