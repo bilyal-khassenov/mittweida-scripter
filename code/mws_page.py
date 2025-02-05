@@ -15,10 +15,6 @@ def main():
     #pushd/cd to the Code Folder
     #streamlit run mws_page.py
 
-    #______________NEWS_AREA______________
-    news_text = "Das Transkriptionstool ist ab sofort für alle Personen mit einem Hochschulaccount einer deutschen Hochschule zugänglich. Zusätzlich wurde ein spezieller Bereich mit Nutzungsstatistiken des Tools eingeführt. In den Transkriptionsergebnissen werden die Konfidenzniveaus nun durch eine farbliche Markierung hervorgehoben."    #If ==None, nothing will be shown below
-    #______________NEWS_AREA______________
-
     #Define variables
     dir_resources = mws_helpers.ProjectPaths().resources_path
     dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
@@ -29,8 +25,6 @@ def main():
     #Read main configs
     configs = mws_helpers.get_configs()
     main_corporate_design_color = configs['ui_settings']['corporate_design_color']
-    previously_transcribed_files_count = configs['features']['previously_transcribed_files_count']
-    previously_transcribed_seconds_count = configs['features']['previously_transcribed_seconds_count']
     ###organisation_email_domain = configs['email']['email_domain']
     texts_from_config_file = configs['texts']['page']
 
@@ -40,8 +34,6 @@ def main():
 
     #Read Stats
     df = pd.read_csv(stats_protocol_file_path, usecols=['duration_seconds'], encoding='Windows-1252')
-    total_duration = df['duration_seconds'].sum()
-    lines_count = df['duration_seconds'].count()
 
     #Logo Area
     placeholder_column, logo_column = st.columns([2,1])
@@ -49,8 +41,13 @@ def main():
     logo_column.image(hsmw_logo)
 
     #News area
-    if news_text is not None:
+    news_text = texts_from_config_file['news_text']
+    if news_text:   #Python treats an empty string ("") as False in a boolean context
         st.write(f":blue[NEW! {news_text}]")   #FOR NEWS
+    #Problems area  #Python treats an empty string ("") as False in a boolean context
+    problems_text = texts_from_config_file['problem_text']
+    if problems_text:
+        st.write(f":red[CAUTION! {problems_text}]")
 
     #Heading Area
     placeholder_column.markdown(f"<h1 class='no-fade'>{configs['texts']['general']['scripter_name']}</h1>", unsafe_allow_html=True)
@@ -111,16 +108,16 @@ def main():
                 with col2:
                     st.area_chart(df[["upload_date", "row_count"]].set_index("upload_date"))
 
-                # Add a bar chart for top 10 institutions
-                st.subheader(texts_from_config_file['top_ten_institutions_chart_heading'])
-                institution_counts = df["institution"].value_counts().head(10)
+                # # # # # Add a bar chart for top 10 institutions
+                # # # # st.subheader(texts_from_config_file['top_ten_institutions_chart_heading'])
+                # # # # institution_counts = df["institution"].value_counts().head(10)
 
-                # Prepare a DataFrame for bar chart
-                institution_df = institution_counts.reset_index()
-                institution_df.columns = ["institution", "Count"]
+                # # # # # Prepare a DataFrame for bar chart
+                # # # # institution_df = institution_counts.reset_index()
+                # # # # institution_df.columns = ["institution", "Count"]
 
-                # Streamlit bar chart
-                st.bar_chart(institution_df.set_index("institution"))
+                # # # # # Streamlit bar chart
+                # # # # st.bar_chart(institution_df.set_index("institution"))
             else:
                 st.error("The uploaded CSV must contain 'upload_timestamp', 'duration_seconds', and 'institution' columns.")
         else:
@@ -129,11 +126,6 @@ def main():
     #Expander for Tutorial
     expander_tutorial = st.expander(texts_from_config_file['how_it_works_header'])
     expander_tutorial.write(texts_from_config_file['how_it_works'])
-
-    # # # # with placeholder_column:
-    # # # #     placeholder_column.markdown(f"<div class='no-fade' style='color: {main_corporate_design_color}; font-size: 25px;'><b>{texts['usage_overview']}:</b></div>", unsafe_allow_html=True)
-    # # # #     placeholder_column.markdown(f"<div class='no-fade' style='color: {main_corporate_design_color};'><b>{texts['transcribed_files']}: {lines_count + previously_transcribed_files_count} 💪</b></div>", unsafe_allow_html=True) #Set previously_transcribed_files_count to 0 in config by new instance of the app
-    # # # #     placeholder_column.markdown(f"<div class='no-fade' style='color: {main_corporate_design_color};'><b>{texts['total_duration']}: {int((total_duration+previously_transcribed_seconds_count)/60/60)} 😎</b></div>", unsafe_allow_html=True) #Set previously_transcribed_seconds_count to 0 in config by new instance of the app
 
     #Data Prootection Declaration
     with st.container(border=True):
