@@ -300,7 +300,7 @@ def process_file(fullname_of_next_unprocessed_file):
 
         #Send the results of transcribing
         try:
-            mws_helpers.send_mail(f"noreply{configs['email']['email_domain']}", [email_address], email_subject, email_text, attachments)
+            mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text, attachments)
         except Exception as e:
             if configs['telegram']['use_telegram'] == True:
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "Transcription was successfull, but an error occured when we tried to send an email")

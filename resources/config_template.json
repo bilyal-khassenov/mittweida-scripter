@@ -4,6 +4,7 @@
         "corporate_design_font": "Open Sans"
     },
     "email":{
+        "noreply_email" : "noreply@placeholder.de",
         "server": "PLACEHOLDER",
         "port": 999999
     },
