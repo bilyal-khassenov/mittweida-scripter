@@ -25,7 +25,6 @@ def main():
     #Read main configs
     configs = mws_helpers.get_configs()
     main_corporate_design_color = configs['ui_settings']['corporate_design_color']
-    ###organisation_email_domain = configs['email']['email_domain']
     texts_from_config_file = configs['texts']['page']
 
     #Streamlit configs
@@ -51,7 +50,7 @@ def main():
 
     #Heading Area
     placeholder_column.markdown(f"<h1 class='no-fade'>{configs['texts']['general']['scripter_name']}</h1>", unsafe_allow_html=True)
-    ####st.markdown(f"<h3 class='no-fade'>{texts['platform_heading']}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 class='no-fade'>{texts_from_config_file['platform_heading']}</h3>", unsafe_allow_html=True)
     st.markdown(f"{texts_from_config_file['welcome_message']}", unsafe_allow_html=True)
 
     #Expander for Stats
