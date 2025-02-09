@@ -28,7 +28,7 @@ The Mittweida Scripter is a robust transcription tool developed at Mittweida Uni
 
 ### Prerequisites
 To run the project locally, ensure you have the following installed:
-- Python 3.12+
+- Python 3.11+
 - Conda (optional) for virtual environment management
 
 ### Setup
@@ -39,7 +39,7 @@ To run the project locally, ensure you have the following installed:
 
 2. Create and activate a virtual environment (optional):
    ```bash
-   conda create --name mittweida-scripter python=3.12
+   conda create --name mittweida-scripter python=3.11
    conda activate mittweida-scripter
 
 3. Install dependencies:
