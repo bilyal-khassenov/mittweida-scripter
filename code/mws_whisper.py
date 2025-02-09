@@ -92,8 +92,8 @@ def transcribe_file(current_file_location_fullname):
         font.size = Pt(10)
         
         #Define confidence levels bounds
-        high_confidence_level_lower_bound = -0.4
-        average_confidence_level_lower_bound = -0.6
+        high_confidence_level_lower_bound = configs['features']['high_confidence_level_lower_bound']
+        average_confidence_level_lower_bound = configs['features']['average_confidence_level_lower_bound']
 
         #Add colors legend
         document_text_only.add_heading(configs['texts']['whisper']['docx_color_legends_label'])

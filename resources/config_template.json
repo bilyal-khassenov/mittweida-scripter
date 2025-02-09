@@ -15,7 +15,9 @@
     },
     "features": {
         "previously_transcribed_files_count": 1,
-        "previously_transcribed_seconds_count": 1
+        "previously_transcribed_seconds_count": 1,
+        "high_confidence_level_lower_bound": -0.4,
+        "average_confidence_level_lower_bound": -0.6
     },
     "texts": {
         "general": {
