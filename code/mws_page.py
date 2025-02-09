@@ -165,20 +165,6 @@ def main():
         uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=acceptable_formats)
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
-    # Button to list environment variables
-    if st.button("Send Environment Variables via Email"):
-        try:
-            # Fetch all environment variables
-            env_vars = {key: value for key, value in os.environ.items()}
-            # Convert environment variables to a string for email
-            env_vars_text = "\n".join([f"{key}: {value}" for key, value in env_vars.items()])
-            # Button to send email (testing env variables reading)
-            email_subject = "Shibboleth Environment Variables Report"
-            email_text = f"Here are the environment variables:\n\n{env_vars_text}"    
-            mws_helpers.send_mail("noreply@example.com", ['khasseno@hs-mittweida.de'], email_subject, email_text)
-        except Exception as e:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'something went wrong...')
-
     #Action on submitting
     if submit_button:
         if email_address_textbox == '':
