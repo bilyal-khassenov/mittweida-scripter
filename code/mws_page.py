@@ -165,8 +165,10 @@ def main():
         uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=acceptable_formats)
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
-    # if st.button("Test Headers"):
-    #     st.success(str(st.context.headers['host']))
+    if st.button("Test Headers"):
+        header_keys = st.context.headers.keys()
+        all_keys_string = ", ".join(header_keys)
+        st.success(all_keys_string)
 
     #Action on submitting
     if submit_button:
