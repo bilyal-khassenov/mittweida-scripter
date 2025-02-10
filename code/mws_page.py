@@ -169,14 +169,14 @@ def main():
         # # # test_header = st.context.headers['Shib-Identity-Provider']
         # # # st.success(test_header)
         # # #print keys
-        header_keys = st.context.headers.keys()
-        all_keys_string = "°".join(header_keys)
-        st.success(all_keys_string)
+        # # # # header_keys = st.context.headers.keys()
+        # # # # all_keys_string = "°".join(header_keys)
+        # # # # st.success(all_keys_string)
 
-        #print vals
-        headers_dict = st.context.headers
-        all_values_string = "°".join(str(value) for value in headers_dict.values())
-        st.success(all_values_string)
+        # # # # #print vals
+        # # # # headers_dict = st.context.headers
+        # # # # all_values_string = "°".join(str(value) for value in headers_dict.values())
+        # # # # st.success(all_values_string)
         st.success("yeap...")
 
 
