@@ -165,21 +165,6 @@ def main():
         uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=acceptable_formats)
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
-    if st.button("Test Headers"):
-        # # # test_header = st.context.headers['Shib-Identity-Provider']
-        # # # st.success(test_header)
-        # # #print keys
-        # # # # header_keys = st.context.headers.keys()
-        # # # # all_keys_string = "°".join(header_keys)
-        # # # # st.success(all_keys_string)
-
-        # # # # #print vals
-        # # # # headers_dict = st.context.headers
-        # # # # all_values_string = "°".join(str(value) for value in headers_dict.values())
-        # # # # st.success(all_values_string)
-        st.success("yeap...")
-
-
     #Action on submitting
     if submit_button:
         if email_address_textbox == '':
@@ -207,7 +192,7 @@ def main():
 
             #Prepare New Protocol Record
             try:
-                institution_referer = st.context.headers[configs['header_names']['referer']]
+                institution_referer = st.context.headers[configs['header_names']['identity_provider']]
             except:
                 institution_referer = None
             new_order_record = [{'upload_timestamp': time.time(),
