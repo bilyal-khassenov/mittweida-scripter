@@ -14,7 +14,7 @@ class ProjectPaths:
         self.in_progress_folder_path = os.path.join(self.uploads_path, '3_in_progress')
         self.processed_folder_path = os.path.join(self.uploads_path, '4_processed')
         self.errors_folder_path = os.path.join(self.uploads_path, '5_errors')
-        self.local_tests_folder_path = os.path.join(self.uploads_path, '6_local_tests')
+        self.local_tests_folder_path = os.path.join(self.uploads_path, '5_local_tests')
         self.uploads_protocol_fullfilename = os.path.join(self.stats_path, 'protocol.csv')
         self.performance_protocol_fullfilename = os.path.join(self.stats_path, 'performance.csv')
 

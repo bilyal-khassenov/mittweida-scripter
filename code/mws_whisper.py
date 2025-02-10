@@ -227,10 +227,10 @@ def transcribe_file(current_file_location_fullname):
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
         print(error_message_for_admins)
         
-        #Move the audio file to the errors folder
-        os.replace(current_file_location_fullname, os.path.join(dir_transcription_errors, os.path.basename(current_file_location_fullname)))
+        #Delete the original file - to-do for later: protocolling mail addresses of user whose files resulted in error?
+        pathlib.Path.unlink(current_file_location_fullname)
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "File has been moved to the error folder")
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "File that resulted in error has been deleted")
 
 def find_new_unprocessed_files():
     # Initialize counter variables and list for unprocessed files
@@ -285,8 +285,6 @@ def process_file(fullname_of_next_unprocessed_file):
         #Extract Email Address and File Name from Base Name (Last Path Component)
         email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 3)[2]
         file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 3)[3]
-        # # # #Prepare User E-Mail Address
-        # # # user_email_address =  f"{email_address}{configs['email']['email_domain']}"
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
