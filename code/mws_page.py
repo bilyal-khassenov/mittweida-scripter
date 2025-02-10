@@ -166,7 +166,7 @@ def main():
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
     # Button to list environment variables
-    if st.button("Send Environment Variables via Email"):
+    if st.button("Test Button env. vars."):
         try:
             # Fetch all environment variables
             env_vars = {key: value for key, value in os.environ.items()}
