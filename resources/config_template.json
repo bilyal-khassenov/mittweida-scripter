@@ -17,6 +17,9 @@
         "high_confidence_level_lower_bound": -0.4,
         "average_confidence_level_lower_bound": -0.6
     },
+    "header_names": {
+        "referer": "referer"
+    },
     "texts": {
         "general": {
             "scripter_name": "Mittweida Scripter"

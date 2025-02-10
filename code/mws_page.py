@@ -165,34 +165,6 @@ def main():
         uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=acceptable_formats)
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
-    # Button to list environment variables
-    from streamlit.web.server.websocket_headers import _get_websocket_headers
-    if st.button("Test Button env. vars."):
-        st.success(str(st.context.headers["SHIB_UNIVERSITY"]))
-        # # # try:
-        # # #     # # # # headers = _get_websocket_headers()
-        # # #     # # # # access_token = headers.get("SHIB_UNIVERSITY")
-            
-        # # #     #access_token = st.context.cookies("SHIB_UNIVERSITY")
-        # # #     #access_token = st.context.headers["SHIB_UNIVERSITY"]
-        # # #     st.success(str(st.context.headers["SHIB_UNIVERSITY"]))
-
-        # # #     # # # if access_token is not None:
-        # # #     # # # # authenticate the user or whatever
-                
-        # # #     # # #     st.success("testing successfull!")
-        # # #     # # #     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing successfull!')
-        # # #     # # #     # Button to send email (testing env variables reading)
-        # # #     # # #     email_subject = "Shibboleth Headers Test"
-        # # #     # # #     email_text = f"Here is the university value:\n\n{access_token}"    
-        # # #     # # #     mws_helpers.send_mail("noreply@example.com", ['khasseno@hs-mittweida.de'], email_subject, email_text)
-        # # #     # # # else:
-        # # #     # # #     st.error("testing not successfull...")
-        # # #     # # #     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing not successfull...')
-        # # # except Exception as e:
-        # # #     st.error(e)
-        # # #     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'something went wrong')
-
     #Action on submitting
     if submit_button:
         if email_address_textbox == '':
@@ -219,11 +191,15 @@ def main():
             originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)
 
             #Prepare New Protocol Record
-            #TO DO - Get Shibboleth value of the institution here!!!
+            try:
+                institution_referer = st.context.headers[configs['header_names']['referer']]
+            except:
+                institution_referer = None
             new_order_record = [{'upload_timestamp': time.time(),
                                     'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
                                     'duration_seconds': None,
-                                    'file_size': None}]
+                                    'file_size': None,
+                                    'institution': institution_referer}]
 
             #Save uploaded file to the folder for file conversion
             with open(originally_uploaded_file_fullname, mode='wb') as w:
