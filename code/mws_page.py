@@ -166,18 +166,24 @@ def main():
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
     # Button to list environment variables
+    from streamlit.web.server.websocket_headers import _get_websocket_headers
     if st.button("Test Button env. vars."):
         try:
-            # Fetch all environment variables
-            env_vars = {key: value for key, value in os.environ.items()}
-            # Convert environment variables to a string for email
-            env_vars_text = "\n".join([f"{key}: {value}" for key, value in env_vars.items()])
-            # Button to send email (testing env variables reading)
-            email_subject = "Shibboleth Environment Variables Report"
-            email_text = f"Here are the environment variables:\n\n{env_vars_text}"    
-            mws_helpers.send_mail("noreply@example.com", ['khasseno@hs-mittweida.de'], email_subject, email_text)
+            headers = _get_websocket_headers()
+            access_token = headers.get("SHIB_UNIVERSITY")
+            if access_token is not None:
+            # authenticate the user or whatever
+                st.success("testing successfull!")
+                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing successfull!')
+                # Button to send email (testing env variables reading)
+                email_subject = "Shibboleth Headers Test"
+                email_text = f"Here is the university value:\n\n{access_token}"    
+                mws_helpers.send_mail("noreply@example.com", ['khasseno@hs-mittweida.de'], email_subject, email_text)
+            else:
+                st.error("testing not successfull...")
+                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing not successfull...')
         except Exception as e:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'something went wrong...')
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'something went wrong')
 
     #Action on submitting
     if submit_button:
