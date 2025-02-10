@@ -166,7 +166,7 @@ def main():
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
     if st.button("Test Headers"):
-        st.success(st.context.headers[configs['header_names']['referer']])
+        st.success(st.context.headers['referer'])
 
     #Action on submitting
     if submit_button:
