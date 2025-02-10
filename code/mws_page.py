@@ -166,9 +166,12 @@ def main():
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
     if st.button("Test Headers"):
-        header_keys = st.context.headers.keys()
-        all_keys_string = ", ".join(header_keys)
-        st.success(all_keys_string)
+        # # header_keys = st.context.headers.keys()
+        # # all_keys_string = ", ".join(header_keys)
+        # # st.success(all_keys_string)
+        test_header = st.context.headers['Shib-Identity-Provider']
+        st.success(test_header)
+
 
     #Action on submitting
     if submit_button:
