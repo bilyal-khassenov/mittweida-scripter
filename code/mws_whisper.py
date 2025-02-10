@@ -312,7 +312,6 @@ def process_file(fullname_of_next_unprocessed_file):
                 try:
                     # Copy the file
                     shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path, os.path.basename(results_file)))
-                    ####print(f"File copied from {source} to {destination}")
                 except FileNotFoundError:
                     print("Source file not found!")
                 except PermissionError:
