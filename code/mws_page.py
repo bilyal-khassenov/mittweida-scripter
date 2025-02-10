@@ -168,22 +168,30 @@ def main():
     # Button to list environment variables
     from streamlit.web.server.websocket_headers import _get_websocket_headers
     if st.button("Test Button env. vars."):
-        try:
-            headers = _get_websocket_headers()
-            access_token = headers.get("SHIB_UNIVERSITY")
-            if access_token is not None:
-            # authenticate the user or whatever
-                st.success("testing successfull!")
-                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing successfull!')
-                # Button to send email (testing env variables reading)
-                email_subject = "Shibboleth Headers Test"
-                email_text = f"Here is the university value:\n\n{access_token}"    
-                mws_helpers.send_mail("noreply@example.com", ['khasseno@hs-mittweida.de'], email_subject, email_text)
-            else:
-                st.error("testing not successfull...")
-                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing not successfull...')
-        except Exception as e:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'something went wrong')
+        st.success(str(st.context.headers["SHIB_UNIVERSITY"]))
+        # # # try:
+        # # #     # # # # headers = _get_websocket_headers()
+        # # #     # # # # access_token = headers.get("SHIB_UNIVERSITY")
+            
+        # # #     #access_token = st.context.cookies("SHIB_UNIVERSITY")
+        # # #     #access_token = st.context.headers["SHIB_UNIVERSITY"]
+        # # #     st.success(str(st.context.headers["SHIB_UNIVERSITY"]))
+
+        # # #     # # # if access_token is not None:
+        # # #     # # # # authenticate the user or whatever
+                
+        # # #     # # #     st.success("testing successfull!")
+        # # #     # # #     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing successfull!')
+        # # #     # # #     # Button to send email (testing env variables reading)
+        # # #     # # #     email_subject = "Shibboleth Headers Test"
+        # # #     # # #     email_text = f"Here is the university value:\n\n{access_token}"    
+        # # #     # # #     mws_helpers.send_mail("noreply@example.com", ['khasseno@hs-mittweida.de'], email_subject, email_text)
+        # # #     # # # else:
+        # # #     # # #     st.error("testing not successfull...")
+        # # #     # # #     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'testing not successfull...')
+        # # # except Exception as e:
+        # # #     st.error(e)
+        # # #     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'something went wrong')
 
     #Action on submitting
     if submit_button:
