@@ -9,51 +9,48 @@ from unidecode import unidecode
 #Import helper functions
 import mws_helpers
 
-def main():
-    #To test locally:
-    #conda activate [env_name]
-    #pushd/cd to the Code Folder
-    #streamlit run mws_page.py
+#Define variables
+dir_resources = mws_helpers.ProjectPaths().resources_path
+dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
+dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
+dir_unprocessed = mws_helpers.ProjectPaths().unprocessed_folder_path
+stats_protocol_file_path = mws_helpers.ProjectPaths().uploads_protocol_fullfilename
+configs = mws_helpers.get_configs()
+texts_from_config_file = configs['texts']['page']
 
-    #Define variables
-    dir_resources = mws_helpers.ProjectPaths().resources_path
-    dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
-    dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
-    dir_unprocessed = mws_helpers.ProjectPaths().unprocessed_folder_path
-    stats_protocol_file_path = mws_helpers.ProjectPaths().uploads_protocol_fullfilename
-
-    #Read main configs
-    configs = mws_helpers.get_configs()
-    main_corporate_design_color = configs['ui_settings']['corporate_design_color']
-    texts_from_config_file = configs['texts']['page']
-
-    #Streamlit configs
-    favicon_path = Image.open(os.path.join(dir_resources, 'favicon.ico'))
-    st.set_page_config(page_title=configs['texts']['general']['scripter_name'], page_icon=favicon_path)
-
-    #Read Stats
-    df = pd.read_csv(stats_protocol_file_path, usecols=['duration_seconds'], encoding='Windows-1252')
-
-    #Logo Area
+def logo_area():
     placeholder_column, logo_column = st.columns([2,1])
     hsmw_logo = Image.open(os.path.join(dir_resources, 'logo.png'))
     logo_column.image(hsmw_logo)
-
-    #News area
+def news_area():
     news_text = texts_from_config_file['news_text']
     if news_text:   #Python treats an empty string ("") as False in a boolean context
-        st.write(f":blue[NEW! {news_text}]")   #FOR NEWS
+        st.write(f":blue[NEW! {news_text}]")
     #Problems area  #Python treats an empty string ("") as False in a boolean context
     problems_text = texts_from_config_file['problem_text']
     if problems_text:
         st.write(f":red[CAUTION! {problems_text}]")
-
-    #Heading Area
-    placeholder_column.markdown(f"<h1 class='no-fade'>{configs['texts']['general']['scripter_name']}</h1>", unsafe_allow_html=True)
+def heading_area():
+    st.markdown(f"<h1 class='no-fade'>{configs['texts']['general']['scripter_name']}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h3 class='no-fade'>{texts_from_config_file['platform_heading']}</h3>", unsafe_allow_html=True)
-    st.markdown(f"{texts_from_config_file['welcome_message']}", unsafe_allow_html=True)
-
-    #Expander for Stats
+    ###st.markdown(f"{texts_from_config_file['welcome_message']}", unsafe_allow_html=True)
+def tutorial_area():
+    expander_tutorial = st.expander(texts_from_config_file['how_it_works_header'])
+    expander_tutorial.write(texts_from_config_file['how_it_works'])
+def data_protection_declaration_area():
+    #Data Prootection Declaration
+    with st.container(border=True):
+        #Consent Area
+        col1_checkbox, col2_text = st.columns([20, 1])
+        with col1_checkbox:
+            st.markdown(f"<p class='no-fade'>{texts_from_config_file['consent_text']}</p>", unsafe_allow_html=True)
+        with col2_text:
+            data_protection_agreed = st.checkbox("&nbsp;", value=False, label_visibility='collapsed')    
+    return(data_protection_agreed)
+def data_privacy_note_area():
+    expander_data_privacy = st.expander(texts_from_config_file['data_privacy_note_lable'])
+    expander_data_privacy.markdown(f"<p class='no-fade'>{texts_from_config_file['data_privacy_note']}</p>", unsafe_allow_html=True)
+def stats_area():
     expander_stats = st.expander(texts_from_config_file['stats_expander_heading'])
     with expander_stats:
         if stats_protocol_file_path is not None:
@@ -122,21 +119,24 @@ def main():
         else:
             st.info("Please upload a CSV file to get started.")
 
-    #Expander for Tutorial
-    expander_tutorial = st.expander(texts_from_config_file['how_it_works_header'])
-    expander_tutorial.write(texts_from_config_file['how_it_works'])
+def main():
+    #To test locally:
+    #conda activate [env_name]
+    #pushd/cd to the Code Folder
+    #streamlit run mws_page.py
 
-    #Data Prootection Declaration
-    with st.container(border=True):
-        #Consent Area
-        col1_checkbox, col2_text = st.columns([20, 1])
-        with col1_checkbox:
-            st.markdown(f"<p class='no-fade'>{texts_from_config_file['consent_text']}</p>", unsafe_allow_html=True)
-        with col2_text:
-            data_protection_agreed = st.checkbox("&nbsp;", value=False, label_visibility='collapsed')    
-        #Expander for Data Privacy Note
-        expander_data_privacy = st.expander(texts_from_config_file['data_privacy_note_lable'])
-        expander_data_privacy.markdown(f"<p class='no-fade'>{texts_from_config_file['data_privacy_note']}</p>", unsafe_allow_html=True)
+    #Streamlit configs
+    favicon_path = Image.open(os.path.join(dir_resources, 'favicon.ico'))
+    st.set_page_config(page_title=configs['texts']['general']['scripter_name'], page_icon=favicon_path)
+
+    #Read Stats
+    df = pd.read_csv(stats_protocol_file_path, usecols=['duration_seconds'], encoding='Windows-1252')
+
+    #Areas of the page
+    logo_area()
+    news_area()
+    heading_area()
+    data_protection_agreed = data_protection_declaration_area()
 
     #Define CSS for greyed-out & normal text using opacity (exclude specific sections)
     grey_style = mws_helpers.get_css_opacity_style_code('grey')
@@ -151,13 +151,9 @@ def main():
     #Initialize values in Session State
     if "form_elements_disabled" not in st.session_state:
         st.session_state.disabled = False
-    def disable_form():
-        st.session_state.disabled = True
-
-    #Get list of acceptable file formats
-    acceptable_formats = mws_helpers.get_acceptable_format_extensions()
 
     #Main form
+    acceptable_formats = mws_helpers.get_acceptable_format_extensions() #Get list of acceptable file formats
     with st.form(key="Form :", clear_on_submit = False):
         #E-Mail Adress
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
@@ -172,74 +168,80 @@ def main():
         elif uploaded_file is None:
             st.error(texts_from_config_file['error_file_not_selected'], icon="🚨")
         elif re.compile(r'^\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b$').search(email_address_textbox):   #If it is a valid e-mail address
-            #Transliterate input file name
-            file_name_stem = unidecode(uploaded_file.name)
-            #Sanitize Filename
-            file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", file_name_stem)
-            #Replace spaces with undescore charachter
-            re_pattern_space_char = r'[^\w_.-]'
-            file_name_stem = re.sub(re_pattern_space_char, '_', file_name_stem)
-            # Replace consecutive non-alphanumeric characters with a single underscore
-            file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', file_name_stem)
-            # Remove leading and trailing underscores
-            file_name_stem = file_name_stem.strip('_')
-            #Combine file name from compenents
-            new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{file_name_stem}"[0:68]
+            with st.spinner(texts_from_config_file['uploading_file_process_spinner_label']):  # Show spinner
+                #Transliterate input file name
+                file_name_stem = unidecode(uploaded_file.name)
+                #Sanitize Filename
+                file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", file_name_stem)
+                #Replace spaces with undescore charachter
+                re_pattern_space_char = r'[^\w_.-]'
+                file_name_stem = re.sub(re_pattern_space_char, '_', file_name_stem)
+                # Replace consecutive non-alphanumeric characters with a single underscore
+                file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', file_name_stem)
+                # Remove leading and trailing underscores
+                file_name_stem = file_name_stem.strip('_')
+                #Combine file name from compenents
+                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{file_name_stem}"[0:68]
 
-            #Prepare initial path
-            format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
-            originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)
+                #Prepare initial path
+                format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
+                originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)
 
-            #Prepare New Protocol Record
-            try:
-                institution_referer = st.context.headers[configs['header_names']['identity_provider']]
-            except:
-                institution_referer = None
-            new_order_record = [{'upload_timestamp': time.time(),
-                                    'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
-                                    'duration_seconds': None,
-                                    'file_size': None,
-                                    'institution': institution_referer}]
+                #Prepare New Protocol Record
+                try:
+                    institution_referer = st.context.headers[configs['header_names']['identity_provider']]
+                except:
+                    institution_referer = None
+                new_order_record = [{'upload_timestamp': time.time(),
+                                        'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
+                                        'duration_seconds': None,
+                                        'file_size': None,
+                                        'institution': institution_referer}]
 
-            #Save uploaded file to the folder for file conversion
-            with open(originally_uploaded_file_fullname, mode='wb') as w:
-                w.write(uploaded_file.getvalue())
+                #Save uploaded file to the folder for file conversion
+                with open(originally_uploaded_file_fullname, mode='wb') as w:
+                    w.write(uploaded_file.getvalue())
 
-            #Transform to an .mp3 in any case to have a standardized form of .mp3
-            standardized_audio_temp_location = os.path.join(dir_format_conversion, new_file_name_stem + '.mp3')  #Prepare path for the final audio file
-            stream = ffmpeg.input(originally_uploaded_file_fullname)
-            stream = ffmpeg.output(stream, standardized_audio_temp_location)
-            ffmpeg.run(stream)
-            #Delete Originally uploaded file
-            pathlib.Path.unlink(originally_uploaded_file_fullname)
+                #Transform to an .mp3 in any case to have a standardized form of .mp3
+                standardized_audio_temp_location = os.path.join(dir_format_conversion, new_file_name_stem + '.mp3')  #Prepare path for the final audio file
+                stream = ffmpeg.input(originally_uploaded_file_fullname)
+                stream = ffmpeg.output(stream, standardized_audio_temp_location)
+                ffmpeg.run(stream)
+                #Delete Originally uploaded file
+                pathlib.Path.unlink(originally_uploaded_file_fullname)
 
-            #Update record
-            new_order_record[0]['duration_seconds'] = MP3(standardized_audio_temp_location).info.length
-            new_order_record[0]['file_size'] = os.path.getsize(standardized_audio_temp_location)
+                #Update record
+                new_order_record[0]['duration_seconds'] = MP3(standardized_audio_temp_location).info.length
+                new_order_record[0]['file_size'] = os.path.getsize(standardized_audio_temp_location)
 
-            #Move audio file to uprocessed folder
-            ready_audio_file_location = pathlib.Path(dir_unprocessed, new_file_name_stem + '.mp3')
-            os.replace(standardized_audio_temp_location, ready_audio_file_location)
+                #Move audio file to uprocessed folder
+                ready_audio_file_location = pathlib.Path(dir_unprocessed, new_file_name_stem + '.mp3')
+                os.replace(standardized_audio_temp_location, ready_audio_file_location)
 
-            #Register new record - transform it to a dataframe
-            new_record_df = pd.DataFrame(new_order_record)
-            #Check if protocol exists. If not, create it
-            mws_helpers.make_sure_protocols_exist()
-            #Read protocol
-            protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
-            #Concatanate protocol records
-            result = pd.concat([protocol, new_record_df])
-            #Save new state of the protocol
-            result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
-            
-            #Send notification to Admin to let him know a new file has been uploaded for Transcription
-            if configs['telegram']['use_telegram'] == True:
-                mws_helpers.send_telegram_message(['BK'], f"{configs['texts']['general']['scripter_name']} - A file has been uploaded")
-            
-            #Success message for user
-            st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
+                #Register new record - transform it to a dataframe
+                new_record_df = pd.DataFrame(new_order_record)
+                #Check if protocol exists. If not, create it
+                mws_helpers.make_sure_protocols_exist()
+                #Read protocol
+                protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
+                #Concatanate protocol records
+                result = pd.concat([protocol, new_record_df])
+                #Save new state of the protocol
+                result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
+                
+                #Send notification to Admin to let him know a new file has been uploaded for Transcription
+                if configs['telegram']['use_telegram'] == True:
+                    mws_helpers.send_telegram_message(['BK'], f"{configs['texts']['general']['scripter_name']} - A file has been uploaded")
+                
+                #Success message for user
+                st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
         else:
-            print(st.error(texts_from_config_file['error_email_in_username'], icon="🚨"))
+            print(st.error(texts_from_config_file['error_wrong_email'], icon="🚨"))
+    
+    #Further Page Areas
+    stats_area()
+    tutorial_area()
+    data_privacy_note_area()
 
 if __name__ == "__main__":
     main()

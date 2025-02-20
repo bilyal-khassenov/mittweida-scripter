@@ -18,7 +18,7 @@
         "average_confidence_level_lower_bound": -0.6
     },
     "header_names": {
-        "referer": "referer"
+        "identity_provider": "identity_provider_palceholder"
     },
     "texts": {
         "general": {
@@ -31,27 +31,27 @@
             "transcribed_files": "Transkribierte Dateien",
             "total_duration": "Gesamtdauer der Transkriptionen (Stunden)",
             "platform_heading": "Audio-To-Text-Plattform der Hochschule Mittweida",
-            "welcome_message": "<p class='no-fade'>Herzlich willkommen auf unserer <b>Transkriptions-Plattform der Hochschule Mittweida</b>! Hier bieten wir Ihnen die Möglichkeit, Audio- und Videodateien <b>DSGVO-konform</b>, <b>schnell</b> und exklusiv <b>auf den Servern der Hochschule Mittweida</b> mithilfe von <b>KI-Lösungen</b> transkribieren zu lassen.</p>",
             "consent_text": "Ich stimme dem Datenschutzhinweis (befindet sich unten) zu und erkläre mich mit der Verarbeitung meiner E-Mail-Adresse zur Nutzung des ‚Mittweida Scripter‘ einverstanden",
             "email_field_lable": "E-Mail-Adresse",
             "select_file": "Datei wählen",
             "send_file": "Datei senden",
-            "how_it_works_header": "Anleitung: So funktioniert das Transkriptionstool ⚙️",
-            "how_it_works": "### So funktioniert das Transkriptionstool:\n\n1. Geben Sie Ihren **Benutzer*****innamen** ein\n2. Wählen Sie dann mit dem Button **'Browse Files'** die benötigte Audio- oder Videodatei aus\n3. Klicken Sie auf **'Datei senden'**, um die ausgewählte Datei zu übermitteln.\n4. Die Datei wird mithilfe des Open-Source-Transkriptionsmodels **Whisper Large v2** transkribiert. Nach Abschluss der Transkription erhalten Sie die **Ergebnisse per E-Mail**. Sowohl die **transkribierte Datei als auch die Ergebnisse** werden unmittelbar nach dem Abschluss des Transkriptionsvorgangs **vom Server gelöscht**, um maximalen **Datenschutz** zu gewährleisten.",
-            "data_privacy_note_lable": "Datenschutzhinweis",
+            "how_it_works_header": "⚙️ So funktioniert das Transkriptionstool",
+            "how_it_works": "Herzlich willkommen auf unserer **Transkriptions-Plattform der Hochschule Mittweida**! Hier bieten wir Ihnen die Möglichkeit, Audio- und Videodateien **DSGVO-konform**, **schnell** und exklusiv **auf den Servern der Hochschule Mittweida** mithilfe von **KI-Lösungen** transkribieren zu lassen.\n\n### So funktioniert das Transkriptionstool:\n\n1. Geben Sie Ihre **E-Mail-Adresse** ein.\n2. Wählen Sie mit dem Button **'Browse Files'** die gewünschte Audio- oder Videodatei aus.\n3. Klicken Sie auf **'Datei senden'**, um die Datei hochzuladen.\n4. Die Datei wird mit dem Open-Source-Transkriptionsmodell **Whisper Large v2** transkribiert.\n5. Nach Abschluss der Transkription erhalten Sie die **Ergebnisse per E-Mail**.\n6. Zur Wahrung Ihrer **Datenschutzrechte** werden sowohl die **hochgeladene Datei als auch die transkribierte Version** unmittelbar nach Abschluss des Vorgangs vom Server gelöscht.\n\nFalls Sie sich dafür interessieren, wie genau das Tool im Hintergrund funktioniert oder wenn Sie selbst eine eigene Instanz hosten möchten, können Sie den Code im öffentlich zugänglichen GitHub-Repository einsehen: 🔗 **[ GitHub-Repository](<https://github.com/bilyal-khassenov/mittweida-scripter>)**",
+            "data_privacy_note_lable": "📝 Datenschutzhinweis",
             "data_privacy_note": "Die bei Nutzung des ‚Mittweida Scripter‘ erfassten personenbezogenen Daten (E-Mail-Adresse) werden ausschließlich für das Transkribieren Ihrer eingegebenen Datei verwendet.\nZur Fehleranalyse der Software wird Ihre E-Mail-Adresse durch einen Hash-Wert pseudonymisiert, sodass ein direkter Personenbezug ausgeschlossen ist. Die Daten werden nicht an Dritte übermittelt.\nNach Wegfall des Verarbeitungszwecks werden die Daten sofort gelöscht. Anderenfalls richten sich die Löschfristen nach hochschulinternen bzw. den gesetzlichen Bestimmungen.\nDie Befugnis, grundsätzlich selbst über die Preisgabe und Verwendung der persönlichen Daten zu bestimmen, ist verfassungsrechtlich geschützt.\nIhre Angaben dürfen daher aus datenschutzrechtlichen Gründen nur verwendet werden, wenn Sie einwilligen. Die Rechtsgrundlage zur Verarbeitung dieser Daten ist Ihre Einwilligung gemäß Art. 6 Abs. 1 Buchstabe a) DS-GVO.\nDie Einwilligung steht Ihnen völlig frei und ist jederzeit mit Wirkung für die Zukunft widerruflich. Schreiben Sie dazu bitte eine E-Mail an datenschutz@hs-mittweida.de.\nDer Widerruf hat zur Folge, dass personenbezogene Daten nicht weiterverwendet werden dürfen und umgehend gelöscht werden. Eine Nutzung des ‚Mittweida Scripter‘ ist jedoch dann auch nicht möglich, weil Ihnen der transkribierte Text dann nicht zugesandt werden kann.\nDie Kontaktdaten des Verantwortlichen und des Datenschutzbeauftragten sind unter https://www.hs-mittweida.de/newsampservice/datenschutz.html hinterlegt.\nDie weiteren Betroffenenrechte im Sinne der DS-GVO sind ebenfalls dort zu finden.",
             "error_username_not_provided": "Bitte fühlen Sie das Feld 'Benutzer*innamen' aus!",
             "error_file_not_selected": "Bitte wählen Sie eine Datei aus, die Sie hochladen möchten!",
             "upload_success_message_part_1" : "Ihre Datei wurde erfolgreich hochgeladen. Sobald die Audiospur dieser Datei erfolgreich transkribiert wurde, erhalten Sie die fertige Transkription der Datei per E-Mail an",
-            "error_email_in_username": "Bitte geben Sie eine gültige E-Mail-Adresse ein!",
-            "stats_expander_heading": "Nutzungsstatistiken 📈",
+            "error_wrong_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein!",
+            "stats_expander_heading": "📈 Nutzungsstatistiken",
             "unique_users_heading_label": "Unique Users",
             "unique_users_value_label": "Benutzer*innen",
             "hours_chart_heading": "Gesamtdauer der Transkriptionen (Stunden)",
             "hours_chart_hours_wording": "Stunden",
             "count_chart_heading": "Anzahl der Transkriptionen",
             "count_chart_files_wording": "Dateien",
-            "top_ten_institutions_chart_heading": "Top 10 Institutionen"
+            "top_ten_institutions_chart_heading": "Top 10 Institutionen",
+            "uploading_file_process_spinner_label": "Datei wird hochgeladen... Einen Moment bitte."
         },
         "whisper":{
             "docx_text_only_title": "Transkription - Nur Text",
