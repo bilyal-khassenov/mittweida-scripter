@@ -156,16 +156,17 @@ def main():
     acceptable_formats = mws_helpers.get_acceptable_format_extensions() #Get list of acceptable file formats
     with st.form(key="Form :", clear_on_submit = False):
         
-        #Create two columns for E-Mail-Address and Language
-        email_column, language_column = st.columns([3, 2])  # Adjust width ratios if needed
-
         #E-Mail-Address
-        with email_column:
-            email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
+        email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
+        #Create two columns for Language & Translation Settings
+        language_column, translation_column = st.columns([1, 1])  # Adjust width ratios if needed
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
             language_name = st.selectbox(texts_from_config_file['language_code_selectbox_label'], capitalized_languages)
+        #Translation Selection Area
+        with translation_column:
+            translation_status = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         #Upload section
         uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=acceptable_formats)
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
@@ -194,9 +195,11 @@ def main():
                 for code, name in mws_helpers.get_whisper_language_codes().items():
                     if name == language_name.lower():
                         language_code = code
+                #Obtain Translation Status
+                translation_status = "To_En" if translation_status == texts_from_config_file['yes'] else "Orig"
                 #Combine file name from compenents
                 language_code_for_file_name = "Auto" if language_code is None else language_code
-                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code_for_file_name}#{file_name_stem}"[0:120]
+                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code_for_file_name}#{translation_status}#{file_name_stem}"[0:120]
 
                 #Prepare initial path
                 format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
@@ -208,12 +211,14 @@ def main():
                 except:
                     institution_referer = '--'
                 language_code_for_protocol = '--' if language_code is None else language_code
+                translation_status_for_protocol = 'translate' if translation_status == "To_En" else 'original'
                 new_order_record = [{'upload_timestamp': time.time(),
                                         'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
                                         'duration_seconds': None,
                                         'file_size': None,
                                         'institution': institution_referer,
-                                        'language_code': language_code_for_protocol}]
+                                        'language_code': language_code_for_protocol,
+                                        'translation_status': translation_status_for_protocol}]
 
                 #Save uploaded file to the folder for file conversion
                 with open(originally_uploaded_file_fullname, mode='wb') as w:

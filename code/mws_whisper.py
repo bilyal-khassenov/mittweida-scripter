@@ -68,9 +68,12 @@ def transcribe_file(current_file_location_fullname):
         current_file_location_fullname = file_in_in_progress_folder_fullname
 
         #Extract Language Code from Base Name
-        language_code = os.path.basename(current_file_location_fullname).split('#', 4)[3]
+        language_code = os.path.basename(current_file_location_fullname).split('#', 5)[3]
         if language_code == "Auto":
             language_code = None
+        #Extract Translation Status from Base Name
+        translation_status = os.path.basename(current_file_location_fullname).split('#', 5)[4]
+        translation_status = 'translate' if translation_status == "To_En" else None
 
         #Retrieve data for protocol
         selected_transcription_model = 'large-v2'
@@ -84,7 +87,7 @@ def transcribe_file(current_file_location_fullname):
             whisper_model = whisper.load_model(selected_transcription_model)                #CUDA not available
 
         #Transcribe
-        result = whisper_model.transcribe(current_file_location_fullname, verbose=True, word_timestamps=True, language=language_code)
+        result = whisper_model.transcribe(current_file_location_fullname, verbose=True, word_timestamps=True, language=language_code, task=translation_status)
 
         #Prepare full name and create document
         new_file_name_stem = pathlib.Path(current_file_location_fullname).stem
@@ -207,9 +210,11 @@ def transcribe_file(current_file_location_fullname):
         transcription_end_time = time.time()
         #Prepare new line for the performance stats
         language_code_for_protocol = '--' if language_code is None else language_code
+        translation_status_for_protocol = 'translate' if translation_status == "translate" else 'original'
         new_perf_record = [{
             'model' : selected_transcription_model,
             'language_code' : language_code_for_protocol,
+            'translation_status' : translation_status_for_protocol,
             'duration_seconds' : file_duration,
             'file_size' : file_size,
             'transcription_start_time' : transcription_start_time,
@@ -290,8 +295,8 @@ def process_file(fullname_of_next_unprocessed_file):
         email_text = configs['texts']['whisper']['email_text']
 
         #Extract Email Address and File Name from Base Name (Last Path Component)
-        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 4)[2]
-        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 4)[4]
+        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 5)[2]
+        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 5)[5]
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
