@@ -195,7 +195,8 @@ def main():
                     if name == language_name.lower():
                         language_code = code
                 #Combine file name from compenents
-                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code}#{file_name_stem}"[0:65]
+                language_code_for_file_name = "Auto" if language_code is None else language_code
+                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code_for_file_name}#{file_name_stem}"[0:120]
 
                 #Prepare initial path
                 format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
