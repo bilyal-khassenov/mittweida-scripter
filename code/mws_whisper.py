@@ -69,7 +69,7 @@ def transcribe_file(current_file_location_fullname):
 
         #Extract Language Code from Base Name
         language_code = os.path.basename(current_file_location_fullname).split('#', 4)[3]
-        if language_code == "None":
+        if language_code == "Auto":
             language_code = None
 
         #Retrieve data for protocol
