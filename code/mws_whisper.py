@@ -67,11 +67,16 @@ def transcribe_file(current_file_location_fullname):
         #Update the path
         current_file_location_fullname = file_in_in_progress_folder_fullname
 
+        #Extract Language Code from Base Name
+        language_code = os.path.basename(current_file_location_fullname).split('#', 4)[3]
+        if language_code == "None":
+            language_code = None
+
         #Retrieve data for protocol
         selected_transcription_model = 'large-v2'
         file_duration = MP3(current_file_location_fullname).info.length
         file_size = os.path.getsize(current_file_location_fullname)
-        
+
         #Load the model
         if torch.cuda.is_available():
             whisper_model = whisper.load_model(selected_transcription_model).cuda().eval()  #CUDA available and will be used for transcribing
@@ -79,7 +84,7 @@ def transcribe_file(current_file_location_fullname):
             whisper_model = whisper.load_model(selected_transcription_model)                #CUDA not available
 
         #Transcribe
-        result = whisper_model.transcribe(current_file_location_fullname, verbose=True, word_timestamps=True)
+        result = whisper_model.transcribe(current_file_location_fullname, verbose=True, word_timestamps=True, language=language_code)
 
         #Prepare full name and create document
         new_file_name_stem = pathlib.Path(current_file_location_fullname).stem
@@ -203,6 +208,7 @@ def transcribe_file(current_file_location_fullname):
         #Prepare new line for the performance stats
         new_perf_record = [{
             'model' : selected_transcription_model,
+            'language_code' : language_code,
             'duration_seconds' : file_duration,
             'file_size' : file_size,
             'transcription_start_time' : transcription_start_time,
@@ -283,8 +289,8 @@ def process_file(fullname_of_next_unprocessed_file):
         email_text = configs['texts']['whisper']['email_text']
 
         #Extract Email Address and File Name from Base Name (Last Path Component)
-        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 3)[2]
-        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 3)[3]
+        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 4)[2]
+        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 4)[4]
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"

@@ -51,7 +51,9 @@
             "count_chart_heading": "Anzahl der Transkriptionen",
             "count_chart_files_wording": "Dateien",
             "top_ten_institutions_chart_heading": "Top 10 Institutionen",
-            "uploading_file_process_spinner_label": "Datei wird hochgeladen... Einen Moment bitte."
+            "uploading_file_process_spinner_label": "Datei wird hochgeladen... Einen Moment bitte.",
+            "language_code_selectbox_label": "Sprache für die Erkennung auswählen",
+            "language_code_selectbox_default_option": "Automatisch"
         },
         "whisper":{
             "docx_text_only_title": "Transkription - Nur Text",
