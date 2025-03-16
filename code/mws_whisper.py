@@ -206,9 +206,10 @@ def transcribe_file(current_file_location_fullname):
         #Get ending time of the transcription
         transcription_end_time = time.time()
         #Prepare new line for the performance stats
+        language_code_for_protocol = '--' if language_code is None else language_code
         new_perf_record = [{
             'model' : selected_transcription_model,
-            'language_code' : language_code,
+            'language_code' : language_code_for_protocol,
             'duration_seconds' : file_duration,
             'file_size' : file_size,
             'transcription_start_time' : transcription_start_time,
