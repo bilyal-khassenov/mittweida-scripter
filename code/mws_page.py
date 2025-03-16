@@ -205,13 +205,14 @@ def main():
                 try:
                     institution_referer = st.context.headers[configs['header_names']['identity_provider']]
                 except:
-                    institution_referer = None
+                    institution_referer = '--'
+                language_code_for_protocol = '--' if language_code is None else language_code
                 new_order_record = [{'upload_timestamp': time.time(),
                                         'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
                                         'duration_seconds': None,
                                         'file_size': None,
                                         'institution': institution_referer,
-                                        'language_code': language_code}]
+                                        'language_code': language_code_for_protocol}]
 
                 #Save uploaded file to the folder for file conversion
                 with open(originally_uploaded_file_fullname, mode='wb') as w:
