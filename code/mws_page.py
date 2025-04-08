@@ -50,6 +50,9 @@ def data_protection_declaration_area():
 def data_privacy_note_area():
     expander_data_privacy = st.expander(texts_from_config_file['data_privacy_note_lable'])
     expander_data_privacy.markdown(f"<p class='no-fade'>{texts_from_config_file['data_privacy_note']}</p>", unsafe_allow_html=True)
+def imprint_area():
+    expander_imprint = st.expander(texts_from_config_file['imprint_area_lable'])
+    expander_imprint.markdown(f"<p class='no-fade'>{texts_from_config_file['imprint_text']}</p>", unsafe_allow_html=True)
 def stats_area():
     expander_stats = st.expander(texts_from_config_file['stats_expander_heading'])
     with expander_stats:
@@ -264,6 +267,7 @@ def main():
     stats_area()
     tutorial_area()
     data_privacy_note_area()
+    imprint_area()
 
 if __name__ == "__main__":
     main()
