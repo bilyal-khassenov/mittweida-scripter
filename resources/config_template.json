@@ -31,7 +31,7 @@
             "transcribed_files": "Transkribierte Dateien",
             "total_duration": "Gesamtdauer der Transkriptionen (Stunden)",
             "platform_heading": "Audio-To-Text-Plattform der Hochschule Mittweida",
-            "consent_text": "Ich habe den Datenschutzhinweis zur Kenntnis genommen und erkläre mich mit der Verarbeitung meiner E-Mail-Adresse zur Nutzung des ‚Mittweida Scripter‘ einverstanden.",
+            "consent_text": "Ich habe den <a href='https://mws.hs-mittweida.de/#:~:text=%F0%9F%93%9D%20Datenschutzhinweis' target='_blank'>Datenschutzhinweis</a> zur Kenntnis genommen und erkläre mich mit der Verarbeitung meiner E-Mail-Adresse zur Nutzung des ‚Mittweida Scripter‘ einverstanden.",
             "email_field_lable": "E-Mail-Adresse",
             "select_file": "Datei wählen",
             "send_file": "Datei senden",
