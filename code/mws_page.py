@@ -5,6 +5,8 @@ from PIL import Image
 from datetime import datetime
 from mutagen.mp3 import MP3
 from unidecode import unidecode
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 #Import helper functions
 import mws_helpers
@@ -106,17 +108,26 @@ def stats_area():
                 # Second column: Row Count Chart
                 with col2:
                     st.area_chart(df[["upload_date", "row_count"]].set_index("upload_date"))
+                
+                #Word Cloud with Institutions Using the Service
+                st.subheader(texts_from_config_file['word_cloud_heading'])
+        
+                # Create and generate a word cloud image
+                wordcloud = WordCloud(
+                    width=1200,         # Increase canvas width
+                    height=600,         # Increase canvas height
+                    background_color='black',
+                    colormap='Blues',   # Or your preferred colormap
+                    margin=0            # Remove extra margin
+                ).generate(texts_from_config_file['word_cloud_string'])
 
-                # # # # # Add a bar chart for top 10 institutions
-                # # # # st.subheader(texts_from_config_file['top_ten_institutions_chart_heading'])
-                # # # # institution_counts = df["institution"].value_counts().head(10)
+                # Create a figure and axis explicitly
+                fig, ax = plt.subplots(figsize=(12, 6), dpi=150, facecolor='black')
+                ax.imshow(wordcloud, interpolation='bilinear')
+                ax.axis("off")  # Hide axes
 
-                # # # # # Prepare a DataFrame for bar chart
-                # # # # institution_df = institution_counts.reset_index()
-                # # # # institution_df.columns = ["institution", "Count"]
-
-                # # # # # Streamlit bar chart
-                # # # # st.bar_chart(institution_df.set_index("institution"))
+                # Display the figure in Streamlit
+                st.pyplot(fig)
             else:
                 st.error("The uploaded CSV must contain 'upload_timestamp', 'duration_seconds', and 'institution' columns.")
         else:
