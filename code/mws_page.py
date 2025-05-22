@@ -181,8 +181,7 @@ def main():
             translation_status = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         #Model Selection Area
         with model_column:
-            #transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'])
-            transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2'])
+            transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'])
         #Upload section
         uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=mws_helpers.get_acceptable_format_extensions())
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
