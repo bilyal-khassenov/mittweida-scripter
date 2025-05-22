@@ -235,9 +235,6 @@ def transcribe_file(current_file_location_fullname):
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
-        #e_type, e_object, e_traceback = sys.exc_info()
-        #e_line_number = e_traceback.tb_lineno
-        #error_message_for_admins = f"During the transcription Process (def transcribe_file) the following error happened: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
@@ -299,8 +296,8 @@ def process_file(fullname_of_next_unprocessed_file):
         email_text = configs['texts']['whisper']['email_text']
 
         #Extract Email Address and File Name from Base Name (Last Path Component)
-        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 5)[2]
-        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 5)[5]
+        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 6)[2]
+        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 6)[6]
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
@@ -345,9 +342,6 @@ def process_file(fullname_of_next_unprocessed_file):
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) A file has been transcribed.")
     except Exception as e:
         #Get exception infos
-        #e_type, e_object, e_traceback = sys.exc_info()
-        #e_line_number = e_traceback.tb_lineno
-        #error_message_for_admins = f"({getpass.getuser()}) - Following error happened during transcription process: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
         error_string = traceback.format_exc()
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
         if configs['telegram']['use_telegram'] == True:
