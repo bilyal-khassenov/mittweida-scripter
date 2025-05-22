@@ -140,7 +140,6 @@ def transcribe_file(current_file_location_fullname):
         
         #Save file
         document_text_only.save(transcript_text_only_file_fullname)
-        mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"WORDS ONLY FILE SAVED! - {transcript_text_only_file_fullname}")
 
         #Perform diarization
         conversation_turns_diarized = diarize_file(current_file_location_fullname)
