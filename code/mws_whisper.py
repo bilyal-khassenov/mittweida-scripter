@@ -1,5 +1,5 @@
 #Import main packages
-import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass
+import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback
 from mutagen.mp3 import MP3
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
@@ -234,9 +234,11 @@ def transcribe_file(current_file_location_fullname):
         return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
     except Exception as e:
         #Get exception infos
-        e_type, e_object, e_traceback = sys.exc_info()
-        e_line_number = e_traceback.tb_lineno
-        error_message_for_admins = f"During the transcription Process (def transcribe_file) the following error happened: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
+        error_string = traceback.format_exc()
+        #e_type, e_object, e_traceback = sys.exc_info()
+        #e_line_number = e_traceback.tb_lineno
+        #error_message_for_admins = f"During the transcription Process (def transcribe_file) the following error happened: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
+        error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
         print(error_message_for_admins)
