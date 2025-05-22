@@ -1,5 +1,5 @@
 #Import main packages
-import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper
+import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass
 from mutagen.mp3 import MP3
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
@@ -56,7 +56,7 @@ def transcribe_file(current_file_location_fullname):
 
         #Notification
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'A new transcription has started.')
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'({getpass.getuser()}) - A new transcription has started.')
 
         #Remember start time of the transcription process
         transcription_start_time = time.time()
@@ -68,15 +68,17 @@ def transcribe_file(current_file_location_fullname):
         current_file_location_fullname = file_in_in_progress_folder_fullname
 
         #Extract Language Code from Base Name
-        language_code = os.path.basename(current_file_location_fullname).split('#', 5)[3]
+        language_code = os.path.basename(current_file_location_fullname).split('#', 6)[3]
         if language_code == "Auto":
             language_code = None
         #Extract Translation Status from Base Name
-        translation_status = os.path.basename(current_file_location_fullname).split('#', 5)[4]
+        translation_status = os.path.basename(current_file_location_fullname).split('#', 6)[4]
         translation_status = 'translate' if translation_status == "To_En" else None
+        #Extract Selected Transcription Model from Base Name
+        selected_transcription_model = os.path.basename(current_file_location_fullname).split('#', 6)[5]
 
         #Retrieve data for protocol
-        selected_transcription_model = 'large-v2'
+        #selected_transcription_model = 'large-v2'
         file_duration = MP3(current_file_location_fullname).info.length
         file_size = os.path.getsize(current_file_location_fullname)
 
@@ -242,7 +244,7 @@ def transcribe_file(current_file_location_fullname):
         #Delete the original file - to-do for later: protocolling mail addresses of user whose files resulted in error?
         pathlib.Path.unlink(current_file_location_fullname)
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "File that resulted in error has been deleted")
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) File that resulted in error has been deleted")
 
 def find_new_unprocessed_files():
     # Initialize counter variables and list for unprocessed files
@@ -313,10 +315,10 @@ def process_file(fullname_of_next_unprocessed_file):
             mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text, attachments)
         except Exception as e:
             if configs['telegram']['use_telegram'] == True:
-                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "Transcription was successfull, but an error occured when we tried to send an email")
+                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) - Transcription was successfull, but an error occured when we tried to send an email")
             e_type, e_object, e_traceback = sys.exc_info()
             e_line_number = e_traceback.tb_lineno
-            error_message_for_admins = f"Following error happened when trying to send the email: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
+            error_message_for_admins = f"({getpass.getuser()}) - Following error happened when trying to send the email: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
             if configs['telegram']['use_telegram'] == True:
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
             #Copy transcription results to local testings folder
@@ -338,12 +340,12 @@ def process_file(fullname_of_next_unprocessed_file):
 
         #Send notification message
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], "A file has been transcribed.")
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) A file has been transcribed.")
     except Exception as e:
         #Get exception infos
         e_type, e_object, e_traceback = sys.exc_info()
         e_line_number = e_traceback.tb_lineno
-        error_message_for_admins = f"Following error happened during transcription process: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
+        error_message_for_admins = f"({getpass.getuser()}) - Following error happened during transcription process: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
 

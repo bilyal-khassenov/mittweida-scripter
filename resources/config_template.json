@@ -59,7 +59,8 @@
             "language_code_selectbox_default_option": "Automatisch erkennen",
             "tranlation_selection_label": "Ins Englische übersetzen?",
             "yes": "Ja",
-            "no": "Nein"
+            "no": "Nein",
+            "model_selection_label": "Transkriptionsmodell"
         },
         "whisper":{
             "docx_text_only_title": "Transkription - Nur Text",

@@ -1,5 +1,5 @@
 #IMPORT STANDARD MODULES
-import os, pathlib, time, re, ffmpeg
+import os, pathlib, time, re, ffmpeg, getpass
 import streamlit as st, pandas as pd
 from PIL import Image
 from datetime import datetime
@@ -35,7 +35,6 @@ def news_area():
 def heading_area():
     st.markdown(f"<h1 class='no-fade'>{configs['texts']['general']['scripter_name']}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h3 class='no-fade'>{texts_from_config_file['platform_heading']}</h3>", unsafe_allow_html=True)
-    ###st.markdown(f"{texts_from_config_file['welcome_message']}", unsafe_allow_html=True)
 def tutorial_area():
     expander_tutorial = st.expander(texts_from_config_file['how_it_works_header'])
     expander_tutorial.write(texts_from_config_file['how_it_works'])
@@ -167,13 +166,12 @@ def main():
         st.session_state.disabled = False
 
     #Main form
-    acceptable_formats = mws_helpers.get_acceptable_format_extensions() #Get list of acceptable file formats
     with st.form(key="Form :", clear_on_submit = False):
         
         #E-Mail-Address
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
         #Create two columns for Language & Translation Settings
-        language_column, translation_column = st.columns([1, 1])  # Adjust width ratios if needed
+        language_column, translation_column, model_column = st.columns([1, 1, 1])  # Adjust width ratios if needed
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
@@ -181,8 +179,11 @@ def main():
         #Translation Selection Area
         with translation_column:
             translation_status = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
+        #Model Selection Area
+        with model_column:
+            transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'])
         #Upload section
-        uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=acceptable_formats)
+        uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=mws_helpers.get_acceptable_format_extensions())
         submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
 
     #Action on submitting
@@ -213,7 +214,7 @@ def main():
                 translation_status = "To_En" if translation_status == texts_from_config_file['yes'] else "Orig"
                 #Combine file name from compenents
                 language_code_for_file_name = "Auto" if language_code is None else language_code
-                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code_for_file_name}#{translation_status}#{file_name_stem}"[0:120]
+                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code_for_file_name}#{translation_status}#{transcription_model}#{file_name_stem}"[0:120]
 
                 #Prepare initial path
                 format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
@@ -232,7 +233,8 @@ def main():
                                         'file_size': None,
                                         'institution': institution_referer,
                                         'language_code': language_code_for_protocol,
-                                        'translation_status': translation_status_for_protocol}]
+                                        'translation_status': translation_status_for_protocol,
+                                        'transcription_model': transcription_model}]
 
                 #Save uploaded file to the folder for file conversion
                 with open(originally_uploaded_file_fullname, mode='wb') as w:
@@ -267,7 +269,7 @@ def main():
                 
                 #Send notification to Admin to let him know a new file has been uploaded for Transcription
                 if configs['telegram']['use_telegram'] == True:
-                    mws_helpers.send_telegram_message(['BK'], f"{configs['texts']['general']['scripter_name']} - A file has been uploaded")
+                    mws_helpers.send_telegram_message(['BK'], f"{configs['texts']['general']['scripter_name']} ({getpass.getuser()}) - A file has been uploaded")
                 
                 #Success message for user
                 st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
