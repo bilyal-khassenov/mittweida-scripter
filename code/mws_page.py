@@ -42,11 +42,16 @@ def data_protection_declaration_area():
     #Data Prootection Declaration
     with st.container(border=True):
         #Consent Area
-        col1_checkbox, col2_text = st.columns([20, 1])
-        with col1_checkbox:
+        col1_consent_text, col2_checkbox = st.columns([30, 1])
+        with col1_consent_text:
             st.markdown(f"<p class='no-fade'>{texts_from_config_file['consent_text']}</p>", unsafe_allow_html=True)
-        with col2_text:
+        with col2_checkbox:
             data_protection_agreed = st.checkbox("&nbsp;", value=False, label_visibility='collapsed')    
+        #Divider with no margins
+        st.markdown("<hr style='margin: 0;'/>", unsafe_allow_html=True)
+        #Reference to the Data Protection Notice with Hyperlink
+        st.markdown(f"<p class='no-fade'>{texts_from_config_file['data_privacy_note_notice']}</p>", unsafe_allow_html=True)
+
     return(data_protection_agreed)
 def data_privacy_note_area():
     expander_data_privacy = st.expander(texts_from_config_file['data_privacy_note_lable'])
@@ -54,6 +59,20 @@ def data_privacy_note_area():
 def imprint_area():
     expander_imprint = st.expander(texts_from_config_file['imprint_area_lable'])
     expander_imprint.markdown(f"<p class='no-fade'>{texts_from_config_file['imprint_text']}</p>", unsafe_allow_html=True)
+@st.cache_resource
+def generate_wordcloud(text: str):
+    wc = WordCloud(
+        width=1200,
+        height=600,
+        background_color='black',
+        colormap='Blues',
+        margin=0
+    ).generate(text)
+
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=150, facecolor='black')
+    ax.imshow(wc, interpolation='bilinear')
+    ax.axis("off")
+    return fig
 def stats_area():
     expander_stats = st.expander(texts_from_config_file['stats_expander_heading'])
     with expander_stats:
@@ -111,21 +130,7 @@ def stats_area():
                 #Word Cloud with Institutions Using the Service
                 st.subheader(texts_from_config_file['word_cloud_heading'])
         
-                # Create and generate a word cloud image
-                wordcloud = WordCloud(
-                    width=1200,         # Increase canvas width
-                    height=600,         # Increase canvas height
-                    background_color='black',
-                    colormap='Blues',   # Or your preferred colormap
-                    margin=0            # Remove extra margin
-                ).generate(texts_from_config_file['word_cloud_string'])
-
-                # Create a figure and axis explicitly
-                fig, ax = plt.subplots(figsize=(12, 6), dpi=150, facecolor='black')
-                ax.imshow(wordcloud, interpolation='bilinear')
-                ax.axis("off")  # Hide axes
-
-                # Display the figure in Streamlit
+                fig = generate_wordcloud(texts_from_config_file['word_cloud_string'])
                 st.pyplot(fig)
             else:
                 st.error("The uploaded CSV must contain 'upload_timestamp', 'duration_seconds', and 'institution' columns.")
