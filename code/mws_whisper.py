@@ -54,10 +54,6 @@ def diarize_timestamped_words(conversation_turns, timestamped_words):
 def transcribe_file(current_file_location_fullname):
     try:
 
-        #Notification
-        if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'({getpass.getuser()}) - A new transcription has started.')
-
         #Remember start time of the transcription process
         transcription_start_time = time.time()
 
@@ -245,37 +241,6 @@ def transcribe_file(current_file_location_fullname):
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) File that resulted in error has been deleted")
 
-def find_new_unprocessed_files():
-    # Initialize counter variables and list for unprocessed files
-    count_unprocessed = 0
-    files_found_unprocessed = []
-    fullname_of_next_unprocessed_file = None
-
-    # Count unprocessed files
-    for path in os.listdir(dir_unprocessed):
-        file_path = os.path.join(dir_unprocessed, path)
-        # Exclude .gitignore and check if it is a file
-        if os.path.isfile(file_path) and path != '.gitignore':
-            count_unprocessed += 1
-            files_found_unprocessed.append(file_path)
-
-    # Get the name of the next unprocessed file
-    if count_unprocessed >= 1:
-        fullname_of_next_unprocessed_file = files_found_unprocessed[0]
-    
-    return fullname_of_next_unprocessed_file
-
-def get_number_of_currently_processed_files():
-    # Initialize counter variables
-    count_in_progress = 0
-    # Count files in progress
-    for path in os.listdir(dir_in_progress):
-        file_path = os.path.join(dir_in_progress, path)
-        # Exclude .gitignore and check if it is a file
-        if os.path.isfile(file_path) and path != '.gitignore':
-            count_in_progress += 1
-    return count_in_progress
-
 def process_file(fullname_of_next_unprocessed_file):
 
     try:
@@ -332,14 +297,9 @@ def process_file(fullname_of_next_unprocessed_file):
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
-        
         #Delete Word files after sending them
         pathlib.Path.unlink(transcript_text_only_file_fullname)
         pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
-
-        #Send notification message
-        if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) A file has been transcribed.")
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
@@ -354,13 +314,15 @@ def main():
     while 1 < 2:
         #Define seconds to sleep
         seconds = 10
-
         #If there are less than 2 videos currently in progress, then check if there are any new uploaded files to start new transcription process
-        if get_number_of_currently_processed_files() < 2:
-            #Check if a new unprocessed file has been found, and if so, create a daemon process, that we will not be waiting for to end completely
-            check_result = find_new_unprocessed_files()
-            if not check_result is None:
-                another_daemon_process = Process(target=process_file, args=(check_result,))
+        count_files_in_proggress, _ = mws_helpers.count_and_list_files(dir_in_progress)
+        if count_files_in_proggress < 2:
+            #List unprocessed files
+            count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_unprocessed)
+            # Get the name of the next unprocessed file
+            if count_unprocessed >= 1:
+                fullname_of_next_unprocessed_file = unprocessed_files[0]
+                another_daemon_process = Process(target=process_file, args=(fullname_of_next_unprocessed_file,))
                 another_daemon_process.daemon = True
                 another_daemon_process.start()
                 print(f"Something has been loaded and we created a new daemon process for it! Let's sleep again for {seconds} seconds till the next check...")

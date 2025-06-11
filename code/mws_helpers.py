@@ -155,3 +155,16 @@ def generate_hash(input_string):
         return hash_hex
     else:
         return '!!!VALUE NOT PROVIDED!!!'
+    
+def count_and_list_files(folder_path):
+    files = []
+    # Initialize counter variables
+    files_count = 0
+    # Count files in progress
+    for path in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, path)
+        # Exclude .gitignore and check if it is a file
+        if os.path.isfile(file_path) and path != '.gitignore':
+            files_count += 1
+            files.append(file_path)
+    return files_count, files

@@ -68,7 +68,6 @@ def generate_wordcloud(text: str):
         colormap='Blues',
         margin=0
     ).generate(text)
-
     fig, ax = plt.subplots(figsize=(12, 6), dpi=150, facecolor='black')
     ax.imshow(wc, interpolation='bilinear')
     ax.axis("off")
