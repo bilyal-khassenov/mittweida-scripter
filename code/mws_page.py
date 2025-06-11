@@ -16,6 +16,7 @@ dir_resources = mws_helpers.ProjectPaths().resources_path
 dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
 dir_unprocessed = mws_helpers.ProjectPaths().unprocessed_folder_path
+dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 stats_protocol_file_path = mws_helpers.ProjectPaths().uploads_protocol_fullfilename
 configs = mws_helpers.get_configs()
 texts_from_config_file = configs['texts']['page']
@@ -253,7 +254,8 @@ def main():
                 pathlib.Path.unlink(originally_uploaded_file_fullname)
 
                 #Update record
-                new_order_record[0]['duration_seconds'] = MP3(standardized_audio_temp_location).info.length
+                duration_in_seconds = MP3(standardized_audio_temp_location).info.length
+                new_order_record[0]['duration_seconds'] = duration_in_seconds
                 new_order_record[0]['file_size'] = os.path.getsize(standardized_audio_temp_location)
 
                 #Move audio file to uprocessed folder
@@ -273,8 +275,10 @@ def main():
                 
                 #Send notification to Admin to let him know a new file has been uploaded for Transcription
                 if configs['telegram']['use_telegram'] == True:
-                    mws_helpers.send_telegram_message(['BK'], f"{configs['texts']['general']['scripter_name']} ({getpass.getuser()}) - A file has been uploaded")
-                
+                    count_unprocessed, _ = mws_helpers.count_and_list_files(dir_unprocessed)
+                    count_in_progress, _ = mws_helpers.count_and_list_files(dir_in_progress)
+                    mws_helpers.send_telegram_message(['BK'], f"NEW FILE HAS BEEN UPLOADED\nMachine: {getpass.getuser()}\nInstitution: {institution_referer}\nDuration in Minutes: {round(duration_in_seconds/60, 2)}\nFiles Waiting: {count_unprocessed}\nFiles in Progress: {count_in_progress}")
+                    
                 #Success message for user
                 st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
         else:
