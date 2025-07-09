@@ -316,7 +316,7 @@ def main():
         seconds = 10
         #If there are less than 2 videos currently in progress, then check if there are any new uploaded files to start new transcription process
         count_files_in_proggress, _ = mws_helpers.count_and_list_files(dir_in_progress)
-        if count_files_in_proggress < 2:
+        if count_files_in_proggress < configs['features']['max_files_processed_simultaneously']:
             #List unprocessed files
             count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_unprocessed)
             # Get the name of the next unprocessed file

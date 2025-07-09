@@ -15,7 +15,8 @@
     },
     "features": {
         "high_confidence_level_lower_bound": -0.4,
-        "average_confidence_level_lower_bound": -0.6
+        "average_confidence_level_lower_bound": -0.6,
+        "max_files_processed_simultaneously": 4
     },
     "header_names": {
         "identity_provider": "identity_provider_palceholder"
