@@ -137,6 +137,32 @@ def stats_area():
         else:
             st.info("Please upload a CSV file to get started.")
 
+def get_media_info(path):
+    import subprocess
+    import json
+    # Get duration using ffprobe
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries',
+             'format=duration', '-of', 'json', path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+        duration = float(json.loads(result.stdout)['format']['duration'])
+    except Exception:
+        duration = None
+
+    # Get file size in bytes
+    try:
+        size_bytes = os.path.getsize(path)
+    except OSError:
+        size_bytes = None
+
+    return {
+        'duration_seconds': duration,
+        'size_bytes': size_bytes
+    }
+
 def main():
     #To test locally:
     #conda activate [env_name]
@@ -224,7 +250,13 @@ def main():
                 #Prepare initial path
                 format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
                 originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)
-
+                #Save uploaded file to the folder for file conversion
+                with open(originally_uploaded_file_fullname, mode='wb') as w:
+                    w.write(uploaded_file.getvalue())
+                #Gather file info
+                media_info = get_media_info(originally_uploaded_file_fullname)
+                duration_seconds = media_info['duration_seconds']
+                file_size = media_info['size_bytes']
                 #Prepare New Protocol Record
                 try:
                     institution_referer = st.context.headers[configs['header_names']['identity_provider']]
@@ -232,35 +264,32 @@ def main():
                     institution_referer = '--'
                 language_code_for_protocol = '--' if language_code is None else language_code
                 translation_status_for_protocol = 'translate' if translation_status == "To_En" else 'original'
+
                 new_order_record = [{'upload_timestamp': time.time(),
                                         'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
-                                        'duration_seconds': None,
-                                        'file_size': None,
+                                        'duration_seconds': duration_seconds,
+                                        'file_size': file_size,
                                         'institution': institution_referer,
                                         'language_code': language_code_for_protocol,
                                         'translation_status': translation_status_for_protocol,
                                         'transcription_model': transcription_model}]
 
-                #Save uploaded file to the folder for file conversion
-                with open(originally_uploaded_file_fullname, mode='wb') as w:
-                    w.write(uploaded_file.getvalue())
+                # # # #Transform to an .mp3 in any case to have a standardized form of .mp3
+                # # # standardized_audio_temp_location = os.path.join(dir_format_conversion, new_file_name_stem + '.mp3')  #Prepare path for the final audio file
+                # # # stream = ffmpeg.input(originally_uploaded_file_fullname)
+                # # # stream = ffmpeg.output(stream, standardized_audio_temp_location)
+                # # # ffmpeg.run(stream)
+                # # # #Delete Originally uploaded file
+                # # # pathlib.Path.unlink(originally_uploaded_file_fullname)
 
-                #Transform to an .mp3 in any case to have a standardized form of .mp3
-                standardized_audio_temp_location = os.path.join(dir_format_conversion, new_file_name_stem + '.mp3')  #Prepare path for the final audio file
-                stream = ffmpeg.input(originally_uploaded_file_fullname)
-                stream = ffmpeg.output(stream, standardized_audio_temp_location)
-                ffmpeg.run(stream)
-                #Delete Originally uploaded file
-                pathlib.Path.unlink(originally_uploaded_file_fullname)
+                # # # #Update record
+                # # # duration_in_seconds = MP3(standardized_audio_temp_location).info.length
+                # # # new_order_record[0]['duration_seconds'] = duration_in_seconds
+                # # # new_order_record[0]['file_size'] = os.path.getsize(standardized_audio_temp_location)
 
-                #Update record
-                duration_in_seconds = MP3(standardized_audio_temp_location).info.length
-                new_order_record[0]['duration_seconds'] = duration_in_seconds
-                new_order_record[0]['file_size'] = os.path.getsize(standardized_audio_temp_location)
-
-                #Move audio file to uprocessed folder
-                ready_audio_file_location = pathlib.Path(dir_unprocessed, new_file_name_stem + '.mp3')
-                os.replace(standardized_audio_temp_location, ready_audio_file_location)
+                # # # #Move audio file to uprocessed folder
+                # # # ready_audio_file_location = pathlib.Path(dir_unprocessed, new_file_name_stem + '.mp3')
+                # # # os.replace(standardized_audio_temp_location, ready_audio_file_location)
 
                 #Register new record - transform it to a dataframe
                 new_record_df = pd.DataFrame(new_order_record)
@@ -277,7 +306,7 @@ def main():
                 if configs['telegram']['use_telegram'] == True:
                     count_unprocessed, _ = mws_helpers.count_and_list_files(dir_unprocessed)
                     count_in_progress, _ = mws_helpers.count_and_list_files(dir_in_progress)
-                    mws_helpers.send_telegram_message(['BK'], f"NEW FILE HAS BEEN UPLOADED\nMachine: {getpass.getuser()}\nInstitution: {institution_referer}\nDuration in Minutes: {round(duration_in_seconds/60, 2)}\nFiles Waiting: {count_unprocessed}\nFiles in Progress: {count_in_progress}")
+                    mws_helpers.send_telegram_message(['BK'], f"NEW FILE HAS BEEN UPLOADED\nMachine: {getpass.getuser()}\nInstitution: {institution_referer}\nDuration in Minutes: {round(duration_seconds/60, 2)}\nFiles Waiting: {count_unprocessed}\nFiles in Progress: {count_in_progress}")
                     
                 #Success message for user
                 st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")

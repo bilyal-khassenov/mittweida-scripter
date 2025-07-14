@@ -11,6 +11,8 @@ import mws_helpers
 
 #Central paths definition
 new_line_for_f_strings = '\n'
+dir_temp_orig_files = mws_helpers.ProjectPaths().temp_orig_file_path
+dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
 dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 dir_processed = mws_helpers.ProjectPaths().processed_folder_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
@@ -242,13 +244,25 @@ def transcribe_file(current_file_location_fullname):
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) File that resulted in error has been deleted")
 
 def process_file(fullname_of_next_unprocessed_file):
-
+    import ffmpeg
+    #First convert to an .mp3 in any case to have a standardized form of .mp3
+    file_to_convert_name_stem = pathlib.Path(fullname_of_next_unprocessed_file).stem
+    standardized_audio_temp_location = os.path.join(dir_format_conversion, file_to_convert_name_stem + '.mp3')  #Prepare path for the final audio file
+    stream = ffmpeg.input(fullname_of_next_unprocessed_file)
+    stream = ffmpeg.output(stream, standardized_audio_temp_location)
+    ffmpeg.run(stream)
+    #Delete Originally uploaded file
+    pathlib.Path.unlink(fullname_of_next_unprocessed_file)
+    #Move audio file to uprocessed folder
+    ready_audio_file_location = pathlib.Path(dir_unprocessed, file_to_convert_name_stem + '.mp3')
+    os.replace(standardized_audio_temp_location, ready_audio_file_location)
+    
     try:
         #Get starting time
         loop_start_time = time.time()
 
         #Start transcription
-        transcription_result_paths = transcribe_file(fullname_of_next_unprocessed_file)
+        transcription_result_paths = transcribe_file(ready_audio_file_location)
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
 
@@ -318,7 +332,9 @@ def main():
         count_files_in_proggress, _ = mws_helpers.count_and_list_files(dir_in_progress)
         if count_files_in_proggress < configs['features']['max_files_processed_simultaneously']:
             #List unprocessed files
-            count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_unprocessed)
+            #######count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_unprocessed)
+            count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_temp_orig_files)
+
             # Get the name of the next unprocessed file
             if count_unprocessed >= 1:
                 fullname_of_next_unprocessed_file = unprocessed_files[0]
