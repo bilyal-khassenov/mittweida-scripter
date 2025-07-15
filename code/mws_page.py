@@ -276,6 +276,7 @@ def main():
                                         'institution': institution_referer,
                                         'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
                                         'translation_status': translation_setting,
+                                        'diarization_status': diarization_setting,
                                         'transcription_model': transcription_model}]
 
                 #Register new record - transform it to a dataframe

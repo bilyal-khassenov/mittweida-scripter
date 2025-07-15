@@ -71,7 +71,7 @@ def transcribe_file(current_file_location_fullname):
         translation_status = int(os.path.basename(current_file_location_fullname).split('#', 7)[4])
         translation_status = 'translate' if translation_status == 1 else None
         #Extract Diarization Setting form Base Name
-        diarzation_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
+        diarization_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
         #Extract Selected Transcription Model from Base Name
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
         
@@ -139,7 +139,7 @@ def transcribe_file(current_file_location_fullname):
         document_text_only.save(transcript_text_only_file_fullname)
 
         #Perform diarization conditionally
-        if diarzation_setting == 1:
+        if diarization_setting == 1:
             conversation_turns_diarized = diarize_file(current_file_location_fullname)
             #Normalize diarized turns
             normalized_and_diarized_turns = []
@@ -217,6 +217,7 @@ def transcribe_file(current_file_location_fullname):
             'model' : selected_transcription_model,
             'language_code' : language_code_for_protocol,
             'translation_status' : translation_status_for_protocol,
+            'diarization_status' : diarization_setting,
             'duration_seconds' : file_duration,
             'file_size' : file_size,
             'transcription_start_time' : transcription_start_time,
