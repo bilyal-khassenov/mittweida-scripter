@@ -65,7 +65,8 @@
             "speaker_assignment_label": "Sprecher:innen zuordnen?",
             "yes": "Ja",
             "no": "Nein",
-            "model_selection_label": "Transkriptionsmodell"
+            "model_selection_label": "Transkriptionsmodell",
+            "highest_speed_tip": "Tipp: Für die schnellste Transkription wählen Sie das Turbo-Modell ohne Sprecher:innenzuordnung. So wird eine einstündige Datei in etwa nur 1 Minute transkribiert! (allerdings mit einem minimalen Qualitätsverlust)"
         },
         "whisper":{
             "docx_text_only_title": "Transkription - Nur Text",
