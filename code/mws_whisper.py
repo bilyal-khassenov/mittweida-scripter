@@ -308,7 +308,11 @@ def process_file(fullname_of_next_unprocessed_file):
             if configs['telegram']['use_telegram'] == True:
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
             #Copy transcription results to local testings folder
-            files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
+            if transcript_conversation_turns_file_fullname is not None:
+                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+            else:
+                files_list = [transcript_text_only_file_fullname]
+            #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
             for results_file in files_list:
                 try:
                     # Copy the file
