@@ -209,7 +209,7 @@ def main():
             language_name = st.selectbox(texts_from_config_file['language_code_selectbox_label'], capitalized_languages)
         #Translation Selection Area
         with translation_column:
-            translation_status = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
+            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         #Model Selection Area
         with model_column:
             transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'])
@@ -241,12 +241,13 @@ def main():
                 for code, name in mws_helpers.get_whisper_language_codes().items():
                     if name == language_name.lower():
                         language_code = code
+                language_setting = mws_helpers.get_language_setting_index_or_code(language_code)
                 #Obtain Translation Status
-                translation_status = "To_En" if translation_status == texts_from_config_file['yes'] else "Orig"
+                translation_setting = "1" if translation_setting == texts_from_config_file['yes'] else "0"
+                #Obtain transcription model code
+                transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
                 #Combine file name from compenents
-                language_code_for_file_name = "Auto" if language_code is None else language_code
-                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_code_for_file_name}#{translation_status}#{transcription_model}#{file_name_stem}"[0:120]
-
+                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{transcription_model_setting}#{file_name_stem}"[0:120]
                 #Prepare initial path
                 format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
                 originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)
@@ -262,16 +263,14 @@ def main():
                     institution_referer = st.context.headers[configs['header_names']['identity_provider']]
                 except:
                     institution_referer = '--'
-                language_code_for_protocol = '--' if language_code is None else language_code
-                translation_status_for_protocol = 'translate' if translation_status == "To_En" else 'original'
-
+                #Prepare new protocol record
                 new_order_record = [{'upload_timestamp': time.time(),
                                         'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
                                         'duration_seconds': duration_seconds,
                                         'file_size': file_size,
                                         'institution': institution_referer,
-                                        'language_code': language_code_for_protocol,
-                                        'translation_status': translation_status_for_protocol,
+                                        'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
+                                        'translation_status': translation_setting,
                                         'transcription_model': transcription_model}]
 
                 #Register new record - transform it to a dataframe

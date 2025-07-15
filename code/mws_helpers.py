@@ -46,6 +46,31 @@ def get_whisper_language_codes():
             "as": "assamese", "tt": "tatar", "haw": "hawaiian", "ln": "lingala", "ha": "hausa", "ba": "bashkir", "jw": "javanese",
             "su": "sundanese", "yue": "cantonese"}
 
+def get_language_setting_index_or_code(value):
+    language_codes = get_whisper_language_codes()
+    keys = list(language_codes.keys())
+
+    if value == -1:
+        return None
+    elif value is None:
+        return -1
+    elif isinstance(value, str):
+        return keys.index(value)
+    else:
+        return keys[value]
+
+def get_model_setting_index_or_name(value):
+    if isinstance(value, str):
+        if value == 'large-v2':
+            return 0
+        elif value == 'turbo':
+            return 1
+    elif isinstance(value, int):
+        if value == 0:
+            return 'large-v2'
+        elif value == 1:
+            return 'turbo'
+
 def get_configs():
     with open(os.path.join(ProjectPaths().resources_path, 'config.json'), 'r', encoding='utf-8') as config_file:
         configs = json.load(config_file)

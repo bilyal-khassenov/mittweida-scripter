@@ -66,17 +66,14 @@ def transcribe_file(current_file_location_fullname):
         current_file_location_fullname = file_in_in_progress_folder_fullname
 
         #Extract Language Code from Base Name
-        language_code = os.path.basename(current_file_location_fullname).split('#', 6)[3]
-        if language_code == "Auto":
-            language_code = None
+        language_code = mws_helpers.get_language_setting_index_or_code(int(os.path.basename(current_file_location_fullname).split('#', 6)[3]))
         #Extract Translation Status from Base Name
-        translation_status = os.path.basename(current_file_location_fullname).split('#', 6)[4]
-        translation_status = 'translate' if translation_status == "To_En" else None
+        translation_status = int(os.path.basename(current_file_location_fullname).split('#', 6)[4])
+        translation_status = 'translate' if translation_status == 1 else None
         #Extract Selected Transcription Model from Base Name
-        selected_transcription_model = os.path.basename(current_file_location_fullname).split('#', 6)[5]
-
+        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 6)[5]))
+        
         #Retrieve data for protocol
-        #selected_transcription_model = 'large-v2'
         file_duration = MP3(current_file_location_fullname).info.length
         file_size = os.path.getsize(current_file_location_fullname)
 
@@ -332,7 +329,6 @@ def main():
         count_files_in_proggress, _ = mws_helpers.count_and_list_files(dir_in_progress)
         if count_files_in_proggress < configs['features']['max_files_processed_simultaneously']:
             #List unprocessed files
-            #######count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_unprocessed)
             count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_temp_orig_files)
 
             # Get the name of the next unprocessed file
