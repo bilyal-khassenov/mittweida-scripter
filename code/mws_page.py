@@ -60,6 +60,9 @@ def data_privacy_note_area():
 def imprint_area():
     expander_imprint = st.expander(texts_from_config_file['imprint_area_lable'])
     expander_imprint.markdown(f"<p class='no-fade'>{texts_from_config_file['imprint_text']}</p>", unsafe_allow_html=True)
+def contact_area():
+    expander_contact = st.expander(texts_from_config_file['contact_area_lable'])
+    expander_contact.markdown(f"<p class='no-fade'>{texts_from_config_file['contact_text']}</p>", unsafe_allow_html=True)
 @st.cache_resource
 def generate_wordcloud(text: str):
     wc = WordCloud(
@@ -306,6 +309,7 @@ def main():
     tutorial_area()
     data_privacy_note_area()
     imprint_area()
+    contact_area()
 
 if __name__ == "__main__":
     main()
