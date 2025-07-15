@@ -202,7 +202,7 @@ def main():
         #E-Mail-Address
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
         #Create two columns for Language & Translation Settings
-        language_column, translation_column, model_column = st.columns([1, 1, 1])  # Adjust width ratios if needed
+        language_column, translation_column, diarization_column, model_column  = st.columns([1, 1, 1, 1])  # Adjust width ratios if needed
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
@@ -210,6 +210,9 @@ def main():
         #Translation Selection Area
         with translation_column:
             translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
+        #Diarization Setting Area
+        with diarization_column:
+            diarization_setting = st.selectbox(texts_from_config_file['speaker_assignment_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         #Model Selection Area
         with model_column:
             transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'])
@@ -244,10 +247,12 @@ def main():
                 language_setting = mws_helpers.get_language_setting_index_or_code(language_code)
                 #Obtain Translation Status
                 translation_setting = "1" if translation_setting == texts_from_config_file['yes'] else "0"
+                #Obtain Diarizatin Setting
+                diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
                 #Obtain transcription model code
                 transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
                 #Combine file name from compenents
-                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{transcription_model_setting}#{file_name_stem}"[0:120]
+                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{transcription_model_setting}#{file_name_stem}"[0:120]
                 #Prepare initial path
                 format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
                 originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)

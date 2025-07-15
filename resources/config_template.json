@@ -60,6 +60,7 @@
             "language_code_selectbox_label": "Originalsprache",
             "language_code_selectbox_default_option": "Automatisch erkennen",
             "tranlation_selection_label": "Ins Englische übersetzen?",
+            "speaker_assignment_label": "Sprecher:innen zuordnen?",
             "yes": "Ja",
             "no": "Nein",
             "model_selection_label": "Transkriptionsmodell"
@@ -68,7 +69,8 @@
             "docx_text_only_title": "Transkription - Nur Text",
             "docx_color_legends_label": "Farbkennzeichnung der Transkriptionsgenauigkeit",
             "docx_text_conversation_turns_title": "Transkription - Mit Sprecher:innen-Zuordnung",
-            "email_text": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie zwei Dateien: eine mit ausschließlich dem transkribierten Text und eine weitere, die den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln enthält.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
+            "email_text_one_file": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie eine Dateie mit dem transkribierten Text.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
+            "email_text_two_files": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie zwei Dateien: eine mit ausschließlich dem transkribierten Text und eine weitere, die den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln enthält.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_subject": "Transkription"
         }
     }

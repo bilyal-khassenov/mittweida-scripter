@@ -66,12 +66,14 @@ def transcribe_file(current_file_location_fullname):
         current_file_location_fullname = file_in_in_progress_folder_fullname
 
         #Extract Language Code from Base Name
-        language_code = mws_helpers.get_language_setting_index_or_code(int(os.path.basename(current_file_location_fullname).split('#', 6)[3]))
+        language_code = mws_helpers.get_language_setting_index_or_code(int(os.path.basename(current_file_location_fullname).split('#', 7)[3]))
         #Extract Translation Status from Base Name
-        translation_status = int(os.path.basename(current_file_location_fullname).split('#', 6)[4])
+        translation_status = int(os.path.basename(current_file_location_fullname).split('#', 7)[4])
         translation_status = 'translate' if translation_status == 1 else None
+        #Extract Diarization Setting form Base Name
+        diarzation_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
         #Extract Selected Transcription Model from Base Name
-        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 6)[5]))
+        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
         
         #Retrieve data for protocol
         file_duration = MP3(current_file_location_fullname).info.length
@@ -136,69 +138,72 @@ def transcribe_file(current_file_location_fullname):
         #Save file
         document_text_only.save(transcript_text_only_file_fullname)
 
-        #Perform diarization
-        conversation_turns_diarized = diarize_file(current_file_location_fullname)
-        #Normalize diarized turns
-        normalized_and_diarized_turns = []
-        counterchecked_turns = []
-        processed_turns_indexes = []
-        start_clipboarded = None
-        end_clipboarded = None
-        speaker_clipboarded = None
-        for main_turn_checked in conversation_turns_diarized:               #Main normalization loop
-            if not main_turn_checked['index'] in processed_turns_indexes:   #Check if this turn has already been normalized
-                start_clipboarded = main_turn_checked['start']              #In not, remember its starting time
-                end_clipboarded = main_turn_checked['end']                  #Remember its ending time
-                speaker_clipboarded = main_turn_checked['speaker']          #Remember its speaker
-                #Extract only unprocessed turns for counter-check
-                counterchecked_turns = []
-                for counterchecked_turn in conversation_turns_diarized:
-                    if counterchecked_turn['index'] > main_turn_checked['index']:
-                        counterchecked_turns.append(counterchecked_turn)
-                #Perform counter-check
-                for counterchecked_turn in counterchecked_turns:
-                    if counterchecked_turn['speaker'] == main_turn_checked['speaker']:
-                        end_clipboarded = counterchecked_turn['end']
-                        processed_turns_indexes.append(counterchecked_turn['index'])
-                    else:
-                        processed_turns_indexes.append(main_turn_checked['index'])
-                        break
-                #Protocol normalized turn
-                normalized_and_diarized_turns.append({'start' : start_clipboarded, 'end' : end_clipboarded, 'speaker' : speaker_clipboarded})
+        #Perform diarization conditionally
+        if diarzation_setting == 1:
+            conversation_turns_diarized = diarize_file(current_file_location_fullname)
+            #Normalize diarized turns
+            normalized_and_diarized_turns = []
+            counterchecked_turns = []
+            processed_turns_indexes = []
+            start_clipboarded = None
+            end_clipboarded = None
+            speaker_clipboarded = None
+            for main_turn_checked in conversation_turns_diarized:               #Main normalization loop
+                if not main_turn_checked['index'] in processed_turns_indexes:   #Check if this turn has already been normalized
+                    start_clipboarded = main_turn_checked['start']              #In not, remember its starting time
+                    end_clipboarded = main_turn_checked['end']                  #Remember its ending time
+                    speaker_clipboarded = main_turn_checked['speaker']          #Remember its speaker
+                    #Extract only unprocessed turns for counter-check
+                    counterchecked_turns = []
+                    for counterchecked_turn in conversation_turns_diarized:
+                        if counterchecked_turn['index'] > main_turn_checked['index']:
+                            counterchecked_turns.append(counterchecked_turn)
+                    #Perform counter-check
+                    for counterchecked_turn in counterchecked_turns:
+                        if counterchecked_turn['speaker'] == main_turn_checked['speaker']:
+                            end_clipboarded = counterchecked_turn['end']
+                            processed_turns_indexes.append(counterchecked_turn['index'])
+                        else:
+                            processed_turns_indexes.append(main_turn_checked['index'])
+                            break
+                    #Protocol normalized turn
+                    normalized_and_diarized_turns.append({'start' : start_clipboarded, 'end' : end_clipboarded, 'speaker' : speaker_clipboarded})
 
-        #Prepare word-level timestamps
-        timestamped_words = []
-        for segment in result['segments']:
-            for word in segment['words']:
-                timestamped_words.append({'word' : word['word'], 'start' : word['start'], 'end' : word['end']})
+            #Prepare word-level timestamps
+            timestamped_words = []
+            for segment in result['segments']:
+                for word in segment['words']:
+                    timestamped_words.append({'word' : word['word'], 'start' : word['start'], 'end' : word['end']})
 
-        #Assign words to conversation turns
-        completed_conversation_turns = diarize_timestamped_words(normalized_and_diarized_turns, timestamped_words)
-        
-        #Save conversation turns to a Docx File
-        def convert_secs_to_timestamp(seconds):
-            seconds_in_hours = seconds/3600    
-            timestamp = str(datetime.timedelta(hours=seconds_in_hours))[:10]
-            if len(timestamp) == 7:
-                timestamp = timestamp + '.00'
-            return timestamp
-        transcript_conversation_turns_file_fullname = os.path.join(dir_processed, new_file_name_stem + '_conversation_turns.docx')
-        #Create Docx file
-        document_conversation_turns = Document()
-        #Change Docx Settings
-        style = document_conversation_turns.styles['Normal']
-        font = style.font
-        font.name = configs['ui_settings']['corporate_design_font']
-        font.size = Pt(10)
-        #Add heading
-        document_conversation_turns.add_heading(configs['texts']['whisper']['docx_text_conversation_turns_title'])
-        #Add all conversation turns
-        for conversation_turn in completed_conversation_turns:
-            p = document_conversation_turns.add_paragraph('')                                                                                                                           #Add empty speaker line
-            p.add_run(f"{conversation_turn['speaker']} -> {convert_secs_to_timestamp(conversation_turn['start'])}-{convert_secs_to_timestamp(conversation_turn['end'])}").bold = True   #Now add bold text in this speaker line
-            document_conversation_turns.add_paragraph(f"{conversation_turn['text']}")                                                                                                   #And now add the text of this concersation turn
-            document_conversation_turns.add_paragraph('')                                                                                                                               #And here a new line
-        document_conversation_turns.save(transcript_conversation_turns_file_fullname)
+            #Assign words to conversation turns
+            completed_conversation_turns = diarize_timestamped_words(normalized_and_diarized_turns, timestamped_words)
+            
+            #Save conversation turns to a Docx File
+            def convert_secs_to_timestamp(seconds):
+                seconds_in_hours = seconds/3600    
+                timestamp = str(datetime.timedelta(hours=seconds_in_hours))[:10]
+                if len(timestamp) == 7:
+                    timestamp = timestamp + '.00'
+                return timestamp
+            transcript_conversation_turns_file_fullname = os.path.join(dir_processed, new_file_name_stem + '_conversation_turns.docx')
+            #Create Docx file
+            document_conversation_turns = Document()
+            #Change Docx Settings
+            style = document_conversation_turns.styles['Normal']
+            font = style.font
+            font.name = configs['ui_settings']['corporate_design_font']
+            font.size = Pt(10)
+            #Add heading
+            document_conversation_turns.add_heading(configs['texts']['whisper']['docx_text_conversation_turns_title'])
+            #Add all conversation turns
+            for conversation_turn in completed_conversation_turns:
+                p = document_conversation_turns.add_paragraph('')                                                                                                                           #Add empty speaker line
+                p.add_run(f"{conversation_turn['speaker']} -> {convert_secs_to_timestamp(conversation_turn['start'])}-{convert_secs_to_timestamp(conversation_turn['end'])}").bold = True   #Now add bold text in this speaker line
+                document_conversation_turns.add_paragraph(f"{conversation_turn['text']}")                                                                                                   #And now add the text of this concersation turn
+                document_conversation_turns.add_paragraph('')                                                                                                                               #And here a new line
+            document_conversation_turns.save(transcript_conversation_turns_file_fullname)
+        else:
+            transcript_conversation_turns_file_fullname = None
 
         #Delete the original file
         pathlib.Path.unlink(current_file_location_fullname)
@@ -269,11 +274,14 @@ def process_file(fullname_of_next_unprocessed_file):
         time_used_to_transcribe = str(datetime.timedelta(seconds=elapsed_time))
 
         #Prepare message
-        email_text = configs['texts']['whisper']['email_text']
+        if transcript_conversation_turns_file_fullname is not None:
+            email_text = configs['texts']['whisper']['email_text_two_files']
+        else:
+            email_text = configs['texts']['whisper']['email_text_one_file']
 
         #Extract Email Address and File Name from Base Name (Last Path Component)
-        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 6)[2]
-        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 6)[6]
+        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 7)[2]
+        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 7)[7]
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
@@ -283,7 +291,10 @@ def process_file(fullname_of_next_unprocessed_file):
             email_subject = subject_ready
 
         #Prepare attachments
-        attachments = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+        if transcript_conversation_turns_file_fullname is not None:
+            attachments = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+        else:
+            attachments = [transcript_text_only_file_fullname]
 
         #Send the results of transcribing
         try:
@@ -297,7 +308,8 @@ def process_file(fullname_of_next_unprocessed_file):
             if configs['telegram']['use_telegram'] == True:
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
             #Copy transcription results to local testings folder
-            for results_file in [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]:
+            files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
+            for results_file in files_list:
                 try:
                     # Copy the file
                     shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path, os.path.basename(results_file)))
@@ -310,7 +322,8 @@ def process_file(fullname_of_next_unprocessed_file):
 
         #Delete Word files after sending them
         pathlib.Path.unlink(transcript_text_only_file_fullname)
-        pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
+        if transcript_conversation_turns_file_fullname is not None:
+            pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
