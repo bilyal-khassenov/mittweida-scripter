@@ -274,23 +274,6 @@ def main():
                                         'translation_status': translation_status_for_protocol,
                                         'transcription_model': transcription_model}]
 
-                # # # #Transform to an .mp3 in any case to have a standardized form of .mp3
-                # # # standardized_audio_temp_location = os.path.join(dir_format_conversion, new_file_name_stem + '.mp3')  #Prepare path for the final audio file
-                # # # stream = ffmpeg.input(originally_uploaded_file_fullname)
-                # # # stream = ffmpeg.output(stream, standardized_audio_temp_location)
-                # # # ffmpeg.run(stream)
-                # # # #Delete Originally uploaded file
-                # # # pathlib.Path.unlink(originally_uploaded_file_fullname)
-
-                # # # #Update record
-                # # # duration_in_seconds = MP3(standardized_audio_temp_location).info.length
-                # # # new_order_record[0]['duration_seconds'] = duration_in_seconds
-                # # # new_order_record[0]['file_size'] = os.path.getsize(standardized_audio_temp_location)
-
-                # # # #Move audio file to uprocessed folder
-                # # # ready_audio_file_location = pathlib.Path(dir_unprocessed, new_file_name_stem + '.mp3')
-                # # # os.replace(standardized_audio_temp_location, ready_audio_file_location)
-
                 #Register new record - transform it to a dataframe
                 new_record_df = pd.DataFrame(new_order_record)
                 #Check if protocol exists. If not, create it
