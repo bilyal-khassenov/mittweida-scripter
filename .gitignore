@@ -6,6 +6,9 @@ config.json
 # Ignore everything in the .streamlit folder
 .streamlit/*
 
+# Ignore everything in the .vscode folder
+.vscode/*
+
 # Allow the .gitignore file in the .streamlit folder
 !.streamlit/.gitignore
 

@@ -247,20 +247,21 @@ def transcribe_file(current_file_location_fullname):
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"({getpass.getuser()}) File that resulted in error has been deleted")
 
 def process_file(fullname_of_next_unprocessed_file):
-    import ffmpeg
-    #First convert to an .mp3 in any case to have a standardized form of .mp3
-    file_to_convert_name_stem = pathlib.Path(fullname_of_next_unprocessed_file).stem
-    standardized_audio_temp_location = os.path.join(dir_format_conversion, file_to_convert_name_stem + '.mp3')  #Prepare path for the final audio file
-    stream = ffmpeg.input(fullname_of_next_unprocessed_file)
-    stream = ffmpeg.output(stream, standardized_audio_temp_location)
-    ffmpeg.run(stream)
-    #Delete Originally uploaded file
-    pathlib.Path.unlink(fullname_of_next_unprocessed_file)
-    #Move audio file to uprocessed folder
-    ready_audio_file_location = pathlib.Path(dir_unprocessed, file_to_convert_name_stem + '.mp3')
-    os.replace(standardized_audio_temp_location, ready_audio_file_location)
-    
     try:
+        import ffmpeg
+        #First convert to an .mp3 in any case to have a standardized form of .mp3
+        file_to_convert_name_stem = pathlib.Path(fullname_of_next_unprocessed_file).stem
+        standardized_audio_temp_location = os.path.join(dir_format_conversion, file_to_convert_name_stem + '.mp3')  #Prepare path for the final audio file
+        stream = ffmpeg.input(fullname_of_next_unprocessed_file)
+        stream = ffmpeg.output(stream, standardized_audio_temp_location)
+        ffmpeg.run(stream)
+        #Delete Originally uploaded file
+        pathlib.Path.unlink(fullname_of_next_unprocessed_file)
+        #Move audio file to uprocessed folder
+        ready_audio_file_location = pathlib.Path(dir_unprocessed, file_to_convert_name_stem + '.mp3')
+        os.replace(standardized_audio_temp_location, ready_audio_file_location)
+    
+    
         #Get starting time
         loop_start_time = time.time()
 
