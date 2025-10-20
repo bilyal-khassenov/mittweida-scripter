@@ -249,24 +249,29 @@ def transcribe_file(current_file_location_fullname):
 def process_file(fullname_of_next_unprocessed_file):
     try:
         import ffmpeg
-        #First convert to an .mp3 in any case to have a standardized form of .mp3
-        file_to_convert_name_stem = pathlib.Path(fullname_of_next_unprocessed_file).stem
+        #Prepare full path for renaming the original file
+        temp_file_fullpath = os.path.join(dir_format_conversion, "TEMP_" + pathlib.Path(fullname_of_next_unprocessed_file).name)
+        #Move original file to the conversion folder
+        os.replace(fullname_of_next_unprocessed_file, temp_file_fullpath)
+        #Update variable
+        fullname_of_next_unprocessed_file = temp_file_fullpath
+        #Convert to an .mp3 in any case to have a standardized form of .mp3
+        file_to_convert_name_stem = pathlib.Path(fullname_of_next_unprocessed_file).stem.removeprefix("TEMP_")
         standardized_audio_temp_location = os.path.join(dir_format_conversion, file_to_convert_name_stem + '.mp3')  #Prepare path for the final audio file
         stream = ffmpeg.input(fullname_of_next_unprocessed_file)
         stream = ffmpeg.output(stream, standardized_audio_temp_location)
         ffmpeg.run(stream)
         #Delete Originally uploaded file
         pathlib.Path.unlink(fullname_of_next_unprocessed_file)
-        #Move audio file to uprocessed folder
-        ready_audio_file_location = pathlib.Path(dir_unprocessed, file_to_convert_name_stem + '.mp3')
-        os.replace(standardized_audio_temp_location, ready_audio_file_location)
-    
+        #Move audio file to unprocessed folder
+        standardized_audiofile = pathlib.Path(dir_unprocessed, file_to_convert_name_stem + '.mp3')
+        os.replace(standardized_audio_temp_location, standardized_audiofile)
     
         #Get starting time
         loop_start_time = time.time()
 
         #Start transcription
-        transcription_result_paths = transcribe_file(ready_audio_file_location)
+        transcription_result_paths = transcribe_file(standardized_audiofile)
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
 
@@ -330,6 +335,9 @@ def process_file(fullname_of_next_unprocessed_file):
         pathlib.Path.unlink(transcript_text_only_file_fullname)
         if transcript_conversation_turns_file_fullname is not None:
             pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
+        #Send notification
+        if configs['telegram']['use_telegram'] == True:
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'A file has been successfully transcribed')        
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
