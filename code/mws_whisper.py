@@ -249,6 +249,9 @@ def transcribe_file(current_file_location_fullname):
 def process_file(fullname_of_next_unprocessed_file):
     try:
         import ffmpeg
+        #Read media info
+        media_info = mws_helpers.get_media_info(fullname_of_next_unprocessed_file)
+        duration_minutes = round(media_info['duration_seconds']/60, 2)
         #Prepare full path for renaming the original file
         temp_file_fullpath = os.path.join(dir_format_conversion, "TEMP_" + pathlib.Path(fullname_of_next_unprocessed_file).name)
         #Move original file to the conversion folder
@@ -337,7 +340,7 @@ def process_file(fullname_of_next_unprocessed_file):
             pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
         #Send notification
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], 'A file has been successfully transcribed')        
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'A file has been successfully transcribed ({duration_minutes} min. long)')
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()

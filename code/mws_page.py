@@ -140,32 +140,6 @@ def stats_area():
         else:
             st.info("Please upload a CSV file to get started.")
 
-def get_media_info(path):
-    import subprocess
-    import json
-    # Get duration using ffprobe
-    try:
-        result = subprocess.run(
-            ['ffprobe', '-v', 'error', '-show_entries',
-             'format=duration', '-of', 'json', path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT
-        )
-        duration = float(json.loads(result.stdout)['format']['duration'])
-    except Exception:
-        duration = None
-
-    # Get file size in bytes
-    try:
-        size_bytes = os.path.getsize(path)
-    except OSError:
-        size_bytes = None
-
-    return {
-        'duration_seconds': duration,
-        'size_bytes': size_bytes
-    }
-
 def main():
     #To test locally:
     #conda activate [env_name]
@@ -263,7 +237,7 @@ def main():
                 with open(originally_uploaded_file_fullname, mode='wb') as w:
                     w.write(uploaded_file.getvalue())
                 #Gather file info
-                media_info = get_media_info(originally_uploaded_file_fullname)
+                media_info = mws_helpers.get_media_info(originally_uploaded_file_fullname)
                 duration_seconds = media_info['duration_seconds']
                 file_size = media_info['size_bytes']
                 #Prepare New Protocol Record

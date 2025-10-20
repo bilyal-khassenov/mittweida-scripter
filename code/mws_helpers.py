@@ -193,3 +193,29 @@ def count_and_list_files(folder_path):
             files_count += 1
             files.append(file_path)
     return files_count, files
+
+def get_media_info(path):
+    import subprocess
+    import json
+    # Get duration using ffprobe
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries',
+             'format=duration', '-of', 'json', path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+        duration = float(json.loads(result.stdout)['format']['duration'])
+    except Exception:
+        duration = None
+
+    # Get file size in bytes
+    try:
+        size_bytes = os.path.getsize(path)
+    except OSError:
+        size_bytes = None
+
+    return {
+        'duration_seconds': duration,
+        'size_bytes': size_bytes
+    }
