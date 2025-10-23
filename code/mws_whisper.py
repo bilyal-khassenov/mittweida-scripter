@@ -259,7 +259,6 @@ def process_file(fullname_of_next_unprocessed_file):
         else:
             duration_minutes = round(duration_seconds / 60, 2)
             message_text_for_later = f"{duration_minutes} min. long"
-        duration_minutes = round(media_info['duration_seconds']/60, 2)
         #Prepare full path for renaming the original file
         temp_file_fullpath = os.path.join(dir_format_conversion, "TEMP_" + pathlib.Path(fullname_of_next_unprocessed_file).name)
         #Move original file to the conversion folder
