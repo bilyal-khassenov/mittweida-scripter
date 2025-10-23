@@ -251,6 +251,14 @@ def process_file(fullname_of_next_unprocessed_file):
         import ffmpeg
         #Read media info
         media_info = mws_helpers.get_media_info(fullname_of_next_unprocessed_file)
+        # Safely get duration
+        duration_seconds = media_info.get('duration_seconds')
+        if not duration_seconds:
+            duration_minutes = 0
+            message_text_for_later = "Could not read duration for file"
+        else:
+            duration_minutes = round(duration_seconds / 60, 2)
+            message_text_for_later = f"{duration_minutes} min. long"
         duration_minutes = round(media_info['duration_seconds']/60, 2)
         #Prepare full path for renaming the original file
         temp_file_fullpath = os.path.join(dir_format_conversion, "TEMP_" + pathlib.Path(fullname_of_next_unprocessed_file).name)
@@ -340,7 +348,7 @@ def process_file(fullname_of_next_unprocessed_file):
             pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
         #Send notification
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'A file has been successfully transcribed ({duration_minutes} min. long)')
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'A file has been successfully transcribed ({message_text_for_later})')
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
