@@ -138,7 +138,7 @@ def send_mail(send_from, send_to, subject, message, files=[],
     smtp.quit()
     print('Mail sent!')
 
-def send_telegram_message(recipients, message_string: str):
+def send_telegram_message(admin_recipients, message_string: str):
     from urllib.parse import quote_plus
     import requests
 
@@ -146,13 +146,12 @@ def send_telegram_message(recipients, message_string: str):
     configs = get_configs()
 
     #Check how recipients were provided and transform them to list if needed
-    if not isinstance(recipients, list):
-        recipients = [recipient.strip() for recipient in recipients.split(',')]
+    if not isinstance(admin_recipients, list):
+        admin_recipients = [recipient.strip() for recipient in admin_recipients.split(',')]
 
     # Send message to each recipient
-    for recipient in recipients:
-        ###chat_id = allowed_recipients[recipient]
-        send_text = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage?chat_id={configs['telegram']['admin_chat_id']}&parse_mode=Markdown&text={quote_plus(message_string)}&disable_web_page_preview=True"
+    for admin_recipient in admin_recipients:
+        send_text = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage?chat_id={admin_recipient}&parse_mode=Markdown&text={quote_plus(message_string)}&disable_web_page_preview=True"
         response = requests.get(send_text)
     
 def get_css_opacity_style_code(style: Literal['grey', 'normal']):

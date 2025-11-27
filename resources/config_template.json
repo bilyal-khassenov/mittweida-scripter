@@ -10,7 +10,7 @@
     },
     "telegram":{
         "use_telegram" : true,
-        "admin_chat_id": "PLACEHOLDER",
+        "admin_chat_id": ["PLACEHOLDER1", "PLACEHOLDER2"],
         "bot_token": "PLACEHOLDER"
     },
     "features": {
