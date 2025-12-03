@@ -32,7 +32,8 @@ def news_area():
     #Problems area  #Python treats an empty string ("") as False in a boolean context
     problems_text = texts_from_config_file['problem_text']
     if problems_text:
-        st.write(f":red[CAUTION! {problems_text}]")
+        st.write(":red[CAUTION!]")
+        st.write(problems_text)
 def heading_area():
     st.markdown(f"<h1 class='no-fade'>{configs['texts']['general']['scripter_name']}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h3 class='no-fade'>{texts_from_config_file['platform_heading']}</h3>", unsafe_allow_html=True)
