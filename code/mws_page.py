@@ -270,7 +270,7 @@ def main():
                 
                 #Send notification to Admin to let him know a new file has been uploaded for Transcription
                 if configs['telegram']['use_telegram'] == True:
-                    count_unprocessed, _ = mws_helpers.count_and_list_files(dir_unprocessed)
+                    count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
                     count_in_progress, _ = mws_helpers.count_and_list_files(dir_in_progress)
                     mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f"NEW FILE HAS BEEN UPLOADED\nMachine: {getpass.getuser()}\nInstitution: {institution_referer}\nDuration in Minutes: {round(duration_seconds/60, 2)}\nFiles Waiting: {count_unprocessed}\nFiles in Progress: {count_in_progress}")
                     
