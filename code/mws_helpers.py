@@ -10,11 +10,10 @@ class ProjectPaths:
         self.uploads_path = os.path.join(self.code_path.parent, 'uploads')
         self.temp_orig_file_path = os.path.join(self.uploads_path, '0_temp_orig_file')
         self.folder_for_format_conversion_path = os.path.join(self.uploads_path, '1_format_conversion')
-        self.unprocessed_folder_path = os.path.join(self.uploads_path, '2_unprocessed')
-        self.in_progress_folder_path = os.path.join(self.uploads_path, '3_in_progress')
-        self.processed_folder_path = os.path.join(self.uploads_path, '4_processed')
-        self.errors_folder_path = os.path.join(self.uploads_path, '5_errors')
-        self.local_tests_folder_path = os.path.join(self.uploads_path, '5_local_tests')
+        #self.unprocessed_folder_path = os.path.join(self.uploads_path, '2_unprocessed')
+        self.in_progress_folder_path = os.path.join(self.uploads_path, '2_in_progress')
+        self.processed_folder_path = os.path.join(self.uploads_path, '3_processed')
+        self.local_tests_folder_path = os.path.join(self.uploads_path, '4_local_tests')
         self.uploads_protocol_fullfilename = os.path.join(self.stats_path, 'protocol.csv')
         self.performance_protocol_fullfilename = os.path.join(self.stats_path, 'performance.csv')
 
@@ -91,20 +90,7 @@ def make_sure_protocols_exist():
 def send_mail(send_from, send_to, subject, message, files=[],
               server=get_configs()['email']['server'], port=get_configs()['email']['port'], username='', password='',
               use_tls=False):
-    """Compose and send email with provided info and attachments.
 
-    Args:
-        send_from (str): from name
-        send_to (list[str]): to name(s)
-        subject (str): message title
-        message (str): message body
-        files (list[str]): list of file paths to be attached to email
-        server (str): mail server host name
-        port (int): port number
-        username (str): server auth username
-        password (str): server auth password
-        use_tls (bool): use TLS mode
-    """
     import smtplib
     from pathlib import Path
     from email.mime.multipart import MIMEMultipart
@@ -121,19 +107,40 @@ def send_mail(send_from, send_to, subject, message, files=[],
 
     msg.attach(MIMEText(message))
 
-    for path in files:
+    # # # # for path in files:
+    # # # #     part = MIMEBase('application', "octet-stream")
+    # # # #     with open(path, 'rb') as file:
+    # # # #         part.set_payload(file.read())
+    # # # #     encoders.encode_base64(part)
+    # # # #     part.add_header('Content-Disposition',
+    # # # #                     'attachment; filename={}'.format(Path(path).name))
+    # # # #     msg.attach(part)
+
+    for item in files:
+        # Support both old and new style
+        if isinstance(item, (tuple, list)):
+            path, attachment_name = item
+        else:
+            path = item
+            attachment_name = Path(path).name
+
         part = MIMEBase('application', "octet-stream")
         with open(path, 'rb') as file:
             part.set_payload(file.read())
+
         encoders.encode_base64(part)
-        part.add_header('Content-Disposition',
-                        'attachment; filename={}'.format(Path(path).name))
+
+        part.add_header(
+            'Content-Disposition',
+            f'attachment; filename="{attachment_name}"'
+        )
+
         msg.attach(part)
 
     smtp = smtplib.SMTP(server, port)
     if use_tls:
         smtp.starttls()
-    # smtp.login(username, password)
+
     smtp.sendmail(send_from, send_to, msg.as_string())
     smtp.quit()
     print('Mail sent!')
@@ -179,7 +186,47 @@ def generate_hash(input_string):
         return hash_hex
     else:
         return '!!!VALUE NOT PROVIDED!!!'
-    
+
+def generate_key():
+    from cryptography.fernet import Fernet, InvalidToken
+    key = Fernet.generate_key()  # 32-byte URL-safe base64-encoded key
+    print(key)
+
+def get_encryption_key():
+    # Prefer env var for security
+    key = os.environ.get('FILE_ENCRYPTION_KEY')
+    if not key:
+        configs = get_configs()
+        key = configs.get('encryption', {}).get('key')
+    if not key:
+        raise ValueError("Encryption key not found in env or config!")
+    return key.encode()  # Ensure it's bytes
+
+def obfuscate_string(name: str) -> str:
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.backends import default_backend
+    import base64
+    import hashlib
+    key = hashlib.sha256(get_encryption_key()).digest()
+    iv = b"\x00" * 16  # fixed IV (for obfuscation)
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    ct = encryptor.update(name.encode()) + encryptor.finalize()
+    return base64.urlsafe_b64encode(ct).decode("ascii").rstrip("=")
+
+def clarify_string(token: str) -> str:
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.backends import default_backend
+    import base64
+    import hashlib
+    padded = token + "=" * ((4 - len(token) % 4) % 4)
+    ct = base64.urlsafe_b64decode(padded)
+    key = hashlib.sha256(get_encryption_key()).digest()
+    iv = b"\x00" * 16
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    return (decryptor.update(ct) + decryptor.finalize()).decode()
+
 def count_and_list_files(folder_path):
     files = []
     # Initialize counter variables

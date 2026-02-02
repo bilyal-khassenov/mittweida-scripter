@@ -9,7 +9,7 @@
         "port": 999999
     },
     "telegram":{
-        "use_telegram" : true,
+        "use_telegram" : false,
         "admin_chat_id": ["PLACEHOLDER1", "PLACEHOLDER2"],
         "bot_token": "PLACEHOLDER"
     },
@@ -17,6 +17,9 @@
         "high_confidence_level_lower_bound": -0.4,
         "average_confidence_level_lower_bound": -0.6,
         "max_files_processed_simultaneously": 4
+    },
+    "encryption": {
+        "key": "YOUR_BASE64_KEY_HERE_OR_IN_ENV_VARIABLE"
     },
     "header_names": {
         "identity_provider": "identity_provider_palceholder"
@@ -47,7 +50,7 @@
             "contact_text": "Bei Fragen oder Anregungen zum ‚Mittweida Scripter‘ können Sie gerne eine E-Mail an ___ senden.",
             "error_username_not_provided": "Bitte fühlen Sie das Feld 'Benutzer*innamen' aus!",
             "error_file_not_selected": "Bitte wählen Sie eine Datei aus, die Sie hochladen möchten!",
-            "upload_success_message_part_1" : "Ihre Datei wurde erfolgreich hochgeladen. Sobald die Audiospur dieser Datei erfolgreich transkribiert wurde, erhalten Sie die fertige Transkription der Datei per E-Mail an",
+            "upload_success_message_part_1" : "Ihre Datei wurde erfolgreich hochgeladen und verschlüsselt. Sobald die Audiospur dieser Datei erfolgreich transkribiert wurde, erhalten Sie die fertige Transkription der Datei per E-Mail an",
             "error_wrong_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein!",
             "stats_expander_heading": "📈 Nutzungsstatistiken",
             "unique_users_heading_label": "Unique Users",
@@ -74,7 +77,9 @@
             "docx_text_conversation_turns_title": "Transkription - Mit Sprecher:innen-Zuordnung",
             "email_text_one_file": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie eine Dateie mit dem transkribierten Text.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_text_two_files": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie zwei Dateien: eine mit ausschließlich dem transkribierten Text und eine weitere, die den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln enthält.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
-            "email_subject": "Transkription"
+            "email_subject": "Transkription",
+            "text_only_attachment_postfix": "_text_only",
+            "conversation_turns_attachment_postfix": "_conversation_turns"
         }
     }
   }

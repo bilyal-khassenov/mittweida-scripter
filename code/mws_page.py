@@ -1,11 +1,11 @@
 #IMPORT STANDARD MODULES
-import os, pathlib, time, re, ffmpeg, getpass
+import os, pathlib, time, re, getpass
 import streamlit as st, pandas as pd
 from PIL import Image
 from datetime import datetime
-from mutagen.mp3 import MP3
 from unidecode import unidecode
 from wordcloud import WordCloud
+from cryptography.fernet import Fernet
 import matplotlib.pyplot as plt
 
 #Import helper functions
@@ -15,7 +15,6 @@ import mws_helpers
 dir_resources = mws_helpers.ProjectPaths().resources_path
 dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
-dir_unprocessed = mws_helpers.ProjectPaths().unprocessed_folder_path
 dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 stats_protocol_file_path = mws_helpers.ProjectPaths().uploads_protocol_fullfilename
 configs = mws_helpers.get_configs()
@@ -144,8 +143,8 @@ def stats_area():
 def main():
     #To test locally:
     #conda activate [env_name]
-    #pushd/cd to the Code Folder
-    #streamlit run mws_page.py --server.enableXsrfProtection false
+    #pushd/cd to Code Folder
+    #streamlit run mws_page.py OR streamlit run mws_page.py --server.enableXsrfProtection false
 
     #Streamlit configs
     favicon_path = Image.open(os.path.join(dir_resources, 'favicon.ico'))
@@ -207,16 +206,19 @@ def main():
         elif re.compile(r'^\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b$').search(email_address_textbox):   #If it is a valid e-mail address
             with st.spinner(texts_from_config_file['uploading_file_process_spinner_label']):  # Show spinner
                 #Transliterate input file name
-                file_name_stem = unidecode(uploaded_file.name)
+                p = pathlib.Path(uploaded_file.name)
+                userdefined_file_name_stem = unidecode(p.stem)
+                file_extension_of_originally_uploaded_file = p.suffix.lower()
+
                 #Sanitize Filename
-                file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", file_name_stem)
+                userdefined_file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", userdefined_file_name_stem)
                 #Replace spaces with undescore charachter
                 re_pattern_space_char = r'[^\w_.-]'
-                file_name_stem = re.sub(re_pattern_space_char, '_', file_name_stem)
+                userdefined_file_name_stem = re.sub(re_pattern_space_char, '_', userdefined_file_name_stem)
                 #Replace consecutive non-alphanumeric characters with a single underscore
-                file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', file_name_stem)
+                userdefined_file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', userdefined_file_name_stem)
                 #Remove leading and trailing underscores
-                file_name_stem = file_name_stem.strip('_')
+                userdefined_file_name_stem = userdefined_file_name_stem.strip('_')
                 #Obtain Language Code
                 language_code = None
                 for code, name in mws_helpers.get_whisper_language_codes().items():
@@ -230,17 +232,38 @@ def main():
                 #Obtain transcription model code
                 transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
                 #Combine file name from compenents
-                new_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{transcription_model_setting}#{file_name_stem}"[0:120]
-                #Prepare initial path
-                format_suffix_of_user_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
-                originally_uploaded_file_fullname = pathlib.Path(dir_orig_files_temps, new_file_name_stem + format_suffix_of_user_uploaded_file)
-                #Save uploaded file to the folder for file conversion
-                with open(originally_uploaded_file_fullname, mode='wb') as w:
+                plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[0:120]
+                plain_structured_original_file_name = plain_structured_original_file_name_stem + file_extension_of_originally_uploaded_file
+                #Obfuscated 
+                obfuscated_filename_stem = mws_helpers.obfuscate_string(plain_structured_original_file_name_stem)
+                #Prepare paths
+                file_extension_of_originally_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
+                #obfuscated_original_file_fullpath = pathlib.Path(dir_orig_files_temps, obfuscated_original_file_name_stem + format_suffix_of_user_uploaded_file)
+                #obfuscated_encrypted_file_fullpath_enc_postfix = pathlib.Path(dir_orig_files_temps, obfuscated_filename_stem + ".enc")
+                obfuscated_file_fullpath_orig_postfix = pathlib.Path(dir_orig_files_temps, obfuscated_filename_stem + file_extension_of_originally_uploaded_file)
+                
+                #Get bytes of uploaded file
+                uploaded_file_bytes = uploaded_file.getvalue()
+
+                #Temporarily save audio file to gather info
+                with open(obfuscated_file_fullpath_orig_postfix, mode='wb') as w:
                     w.write(uploaded_file.getvalue())
+
                 #Gather file info
-                media_info = mws_helpers.get_media_info(originally_uploaded_file_fullname)
+                media_info = mws_helpers.get_media_info(obfuscated_file_fullpath_orig_postfix)
                 duration_seconds = media_info['duration_seconds']
                 file_size = media_info['size_bytes']
+                #Delete temporary file
+                pathlib.Path.unlink(obfuscated_file_fullpath_orig_postfix)
+
+                #Write encrypted file
+                key = mws_helpers.get_encryption_key()
+                fernet = Fernet(key)
+                encrypted_bytes = fernet.encrypt(uploaded_file_bytes)
+
+                with open(obfuscated_file_fullpath_orig_postfix, "wb") as enc_file: #this filename is used to transfer the original file extension to mws_whisper.py
+                    enc_file.write(encrypted_bytes)
+
                 #Prepare New Protocol Record
                 try:
                     institution_referer = st.context.headers[configs['header_names']['identity_provider']]
