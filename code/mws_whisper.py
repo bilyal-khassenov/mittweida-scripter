@@ -332,19 +332,13 @@ def process_file(obfuscated_encrypted_fullpath):
         else:
             email_subject = subject_ready
 
-        # # # # # #Prepare attachments
-        # # # # # if transcript_conversation_turns_file_fullname is not None:
-        # # # # #     attachments = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
-        # # # # # else:
-        # # # # #     attachments = [transcript_text_only_file_fullname]
-
         # Prepare attachments (with custom email filenames)
         attachments = []
         # Text-only transcript
         attachments.append(
             (
                 transcript_text_only_file_fullname,
-                f"{file_name}{configs['texts']['whisper']['text_only_attachment_postfix']}.txt"
+                f"{file_name}{configs['texts']['whisper']['text_only_attachment_postfix']}.docx"
             )
         )
 
@@ -353,7 +347,7 @@ def process_file(obfuscated_encrypted_fullpath):
             attachments.append(
                 (
                     transcript_conversation_turns_file_fullname,
-                    f"{file_name}{configs['texts']['whisper']['conversation_turns_attachment_postfix']}.txt"
+                    f"{file_name}{configs['texts']['whisper']['conversation_turns_attachment_postfix']}.docx"
                 )
             )
 
@@ -373,7 +367,6 @@ def process_file(obfuscated_encrypted_fullpath):
                 files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
             else:
                 files_list = [transcript_text_only_file_fullname]
-            #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
             for results_file in files_list:
                 try:
                     # Copy the file

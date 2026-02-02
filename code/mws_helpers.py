@@ -107,15 +107,6 @@ def send_mail(send_from, send_to, subject, message, files=[],
 
     msg.attach(MIMEText(message))
 
-    # # # # for path in files:
-    # # # #     part = MIMEBase('application', "octet-stream")
-    # # # #     with open(path, 'rb') as file:
-    # # # #         part.set_payload(file.read())
-    # # # #     encoders.encode_base64(part)
-    # # # #     part.add_header('Content-Disposition',
-    # # # #                     'attachment; filename={}'.format(Path(path).name))
-    # # # #     msg.attach(part)
-
     for item in files:
         # Support both old and new style
         if isinstance(item, (tuple, list)):
