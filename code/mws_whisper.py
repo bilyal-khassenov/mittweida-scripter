@@ -4,6 +4,7 @@ from mutagen.mp3 import MP3
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
 from docx.shared import Pt
+from whisper.utils import get_writer
 ######from docx.document import Document #Keep it for Intellisense!
 
 #Import helper functions
@@ -53,7 +54,7 @@ def diarize_timestamped_words(conversation_turns, timestamped_words):
         conversation_turn['text'] = conversation_turn_text.strip()
     return conversation_turns
 
-def transcribe_file(current_file_location_fullname):
+def transcribe_file(current_file_location_fullname, full_name):
     try:
 
         #Remember start time of the transcription process
@@ -73,12 +74,14 @@ def transcribe_file(current_file_location_fullname):
         #Extract Diarization Setting form Base Name
         diarization_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
         #Extract Selected Transcription Model from Base Name
-        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
+        #selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
         
         #Retrieve data for protocol
         file_duration = MP3(current_file_location_fullname).info.length
         file_size = os.path.getsize(current_file_location_fullname)
 
+        subtitle_setting = int(os.path.basename(full_name).split('#', 7)[6])
+        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
         #Load the model
         if torch.cuda.is_available():
             whisper_model = whisper.load_model(selected_transcription_model).cuda().eval()  #CUDA available and will be used for transcribing
@@ -87,6 +90,23 @@ def transcribe_file(current_file_location_fullname):
 
         #Transcribe
         result = whisper_model.transcribe(current_file_location_fullname, verbose=True, word_timestamps=True, language=language_code, task=translation_status)
+
+        # Create subtitles if requested
+        subtitle_srt_file = None
+        subtitle_vtt_file = None
+
+        if subtitle_setting == 1:
+            print("Creating subtitles...")
+
+            srt_writer = get_writer("srt", dir_processed)
+            srt_writer(result, current_file_location_fullname)
+
+            vtt_writer = get_writer("vtt", dir_processed)
+            vtt_writer(result, current_file_location_fullname)
+
+            subtitle_srt_file = os.path.join(dir_processed, pathlib.Path(current_file_location_fullname).stem + ".srt")
+            subtitle_vtt_file = os.path.join(dir_processed, pathlib.Path(current_file_location_fullname).stem + ".vtt")
+
 
         #Prepare full name and create document
         new_file_name_stem = pathlib.Path(current_file_location_fullname).stem
@@ -232,7 +252,7 @@ def transcribe_file(current_file_location_fullname):
         result = pandas.concat([perf_protocol, new_perf_record_df])
         #Save new state of the protocol
         result.to_csv(path_to_perf_protocol, encoding='Windows-1252', index=False)
-        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, subtitle_vtt_file, subtitle_srt_file]
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
@@ -281,9 +301,11 @@ def process_file(fullname_of_next_unprocessed_file):
         loop_start_time = time.time()
 
         #Start transcription
-        transcription_result_paths = transcribe_file(standardized_audiofile)
+        transcription_result_paths = transcribe_file(standardized_audiofile, fullname_of_next_unprocessed_file)
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
+        subtitle_vtt_file = transcription_result_paths[2]
+        subtitle_srt_file = transcription_result_paths[3]
 
         #Get finish time
         loop_finish_time = time.time()
@@ -313,6 +335,13 @@ def process_file(fullname_of_next_unprocessed_file):
         else:
             attachments = [transcript_text_only_file_fullname]
 
+        # Subtitle files (optional)
+        if subtitle_srt_file is not None:
+            attachments.append(subtitle_srt_file)
+
+        if subtitle_vtt_file is not None:
+            attachments.append(subtitle_vtt_file)
+
         #Send the results of transcribing
         try:
             mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text, attachments)
@@ -326,13 +355,14 @@ def process_file(fullname_of_next_unprocessed_file):
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
             #Copy transcription results to local testings folder
             if transcript_conversation_turns_file_fullname is not None:
-                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, subtitle_vtt_file, subtitle_srt_file]
             else:
-                files_list = [transcript_text_only_file_fullname]
+                files_list = [transcript_text_only_file_fullname, subtitle_vtt_file, subtitle_srt_file]
             #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
             for results_file in files_list:
                 try:
                     # Copy the file
+                    print("Copying:", results_file)
                     shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path, os.path.basename(results_file)))
                 except FileNotFoundError:
                     print("Source file not found!")
@@ -342,9 +372,20 @@ def process_file(fullname_of_next_unprocessed_file):
                     print(f"An error occurred: {e}")
 
         #Delete Word files after sending them
+        # Delete result files after sending them
         pathlib.Path.unlink(transcript_text_only_file_fullname)
+
         if transcript_conversation_turns_file_fullname is not None:
             pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
+
+        if subtitle_srt_file is not None and os.path.exists(subtitle_srt_file):
+            pathlib.Path.unlink(subtitle_srt_file)
+
+        if subtitle_vtt_file is not None and os.path.exists(subtitle_vtt_file):
+            pathlib.Path.unlink(subtitle_vtt_file)
+        # pathlib.Path.unlink(transcript_text_only_file_fullname)
+        # if transcript_conversation_turns_file_fullname is not None:
+        #     pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
         #Send notification
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'A file has been successfully transcribed ({message_text_for_later})')
