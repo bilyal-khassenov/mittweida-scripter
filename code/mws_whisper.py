@@ -4,6 +4,9 @@ from mutagen.mp3 import MP3
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
 from docx.shared import Pt
+from ollama import chat
+from ollama import ChatResponse
+import tiktoken
 ######from docx.document import Document #Keep it for Intellisense!
 
 #Import helper functions
@@ -19,6 +22,7 @@ path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfile
 dir_transcription_errors = mws_helpers.ProjectPaths().errors_folder_path
 dir_unprocessed = mws_helpers.ProjectPaths().unprocessed_folder_path
 configs = mws_helpers.get_configs()
+enc = tiktoken.get_encoding("cl100k_base")
 
 def diarize_file(file_path):
     from pyannote.audio import Pipeline
@@ -53,7 +57,78 @@ def diarize_timestamped_words(conversation_turns, timestamped_words):
         conversation_turn['text'] = conversation_turn_text.strip()
     return conversation_turns
 
-def transcribe_file(current_file_location_fullname):
+def summarize_file(input_data, original_file_path):
+
+    def word_count(text):
+        return len(text.split())
+
+    def chunk_text(text, size=500):
+        return [text[i:i + size] for i in range(0, len(text), size)]
+
+    def chunk_text_tokens(text, max_tokens=512):
+        tokens = enc.encode(text)
+
+        chunks = []
+        for i in range(0, len(tokens), max_tokens):
+            chunk_tokens = tokens[i:i + max_tokens]
+            chunk_text = enc.decode(chunk_tokens)
+            chunks.append(chunk_text)
+
+        return chunks
+
+    def summarize_chunk(text, compression=0.2):
+        nwords_summary = max(50, int(compression * word_count(text)))
+
+        prompt = (
+            f"Your goal is to summarize the given text in maximum {nwords_summary} words. Extract only the most important information."
+            "Only output the summary without any additional text. Answer in german only.")
+
+        response = chat(
+            model='gpt-oss:20b',
+
+
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": text}
+            ]
+        )
+
+        return response['message']['content']
+
+    def hierarchical_reduce(texts):
+        while len(texts) > 1:
+            new_texts = []
+
+            for i in range(0, len(texts), 3):
+                chunk = " ".join(texts[i:i + 3])
+                summary = summarize_chunk(chunk, compression=0.3)
+                new_texts.append(summary)
+
+            texts = new_texts
+
+        return texts[0]
+
+    #chunks = chunk_text(input_data)
+    chunks = chunk_text_tokens(input_data, max_tokens=512)
+    print(f"Chunks: {len(chunks)}")
+
+    summaries = []
+    for chunk in chunks:
+        summary = summarize_chunk(chunk, compression=0.2)
+        summaries.append(summary)
+
+    final_text = hierarchical_reduce(summaries)
+
+    new_file_name_stem = pathlib.Path(original_file_path).stem
+    summary_path = os.path.join(dir_processed, new_file_name_stem + "_summary.docx")
+    document = Document()
+    document.add_heading("Zusammenfassung", 0)
+    document.add_paragraph(final_text)
+    document.save(summary_path)
+    print("Summary: \n" + final_text)
+    return summary_path
+
+def transcribe_file(current_file_location_fullname, full_name):
     try:
 
         #Remember start time of the transcription process
@@ -74,7 +149,9 @@ def transcribe_file(current_file_location_fullname):
         diarization_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
         #Extract Selected Transcription Model from Base Name
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
-        
+        #Extract summary setting from base name
+        summary_setting = int(os.path.basename(full_name).split('#', 7)[6])
+
         #Retrieve data for protocol
         file_duration = MP3(current_file_location_fullname).info.length
         file_size = os.path.getsize(current_file_location_fullname)
@@ -87,6 +164,14 @@ def transcribe_file(current_file_location_fullname):
 
         #Transcribe
         result = whisper_model.transcribe(current_file_location_fullname, verbose=True, word_timestamps=True, language=language_code, task=translation_status)
+
+        #Create summary if requested
+        summary_file = None
+        if summary_setting == 1:
+            print("Creating summary...")
+            summary_file = summarize_file(result["text"], current_file_location_fullname)
+
+
 
         #Prepare full name and create document
         new_file_name_stem = pathlib.Path(current_file_location_fullname).stem
@@ -232,7 +317,7 @@ def transcribe_file(current_file_location_fullname):
         result = pandas.concat([perf_protocol, new_perf_record_df])
         #Save new state of the protocol
         result.to_csv(path_to_perf_protocol, encoding='Windows-1252', index=False)
-        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, summary_file]
     except Exception as e:
         #Get exception infos
         error_string = traceback.format_exc()
@@ -281,9 +366,10 @@ def process_file(fullname_of_next_unprocessed_file):
         loop_start_time = time.time()
 
         #Start transcription
-        transcription_result_paths = transcribe_file(standardized_audiofile)
+        transcription_result_paths = transcribe_file(standardized_audiofile, fullname_of_next_unprocessed_file)
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
+        summary_file = transcription_result_paths[2]
 
         #Get finish time
         loop_finish_time = time.time()
@@ -313,6 +399,9 @@ def process_file(fullname_of_next_unprocessed_file):
         else:
             attachments = [transcript_text_only_file_fullname]
 
+        if summary_file is not None:
+            attachments.append(summary_file)
+
         #Send the results of transcribing
         try:
             mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text, attachments)
@@ -326,13 +415,14 @@ def process_file(fullname_of_next_unprocessed_file):
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
             #Copy transcription results to local testings folder
             if transcript_conversation_turns_file_fullname is not None:
-                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname]
+                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, summary_file]
             else:
-                files_list = [transcript_text_only_file_fullname]
+                files_list = [transcript_text_only_file_fullname, summary_file]
             #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
             for results_file in files_list:
                 try:
                     # Copy the file
+                    print("Copying:", results_file)
                     shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path, os.path.basename(results_file)))
                 except FileNotFoundError:
                     print("Source file not found!")
@@ -345,6 +435,9 @@ def process_file(fullname_of_next_unprocessed_file):
         pathlib.Path.unlink(transcript_text_only_file_fullname)
         if transcript_conversation_turns_file_fullname is not None:
             pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
+
+        if summary_file is not None and os.path.exists(summary_file):
+            pathlib.Path.unlink(summary_file)
         #Send notification
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'A file has been successfully transcribed ({message_text_for_later})')
