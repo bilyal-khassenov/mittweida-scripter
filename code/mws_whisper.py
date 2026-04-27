@@ -73,14 +73,14 @@ def transcribe_file(current_file_location_fullname, full_name):
         translation_status = 'translate' if translation_status == 1 else None
         #Extract Diarization Setting form Base Name
         diarization_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
-        #Extract Selected Transcription Model from Base Name
-        #selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
         
         #Retrieve data for protocol
         file_duration = MP3(current_file_location_fullname).info.length
         file_size = os.path.getsize(current_file_location_fullname)
 
+        #Extract subtitle Setting from Base Name
         subtitle_setting = int(os.path.basename(full_name).split('#', 7)[6])
+        #Extract Selected Transcription Model from Base Name
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
         #Load the model
         if torch.cuda.is_available():
@@ -96,7 +96,6 @@ def transcribe_file(current_file_location_fullname, full_name):
         subtitle_vtt_file = None
 
         if subtitle_setting == 1:
-            print("Creating subtitles...")
 
             srt_writer = get_writer("srt", dir_processed)
             srt_writer(result, current_file_location_fullname)
@@ -362,7 +361,6 @@ def process_file(fullname_of_next_unprocessed_file):
             for results_file in files_list:
                 try:
                     # Copy the file
-                    print("Copying:", results_file)
                     shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path, os.path.basename(results_file)))
                 except FileNotFoundError:
                     print("Source file not found!")

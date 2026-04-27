@@ -20,7 +20,6 @@ dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 stats_protocol_file_path = mws_helpers.ProjectPaths().uploads_protocol_fullfilename
 configs = mws_helpers.get_configs()
 texts_from_config_file = configs['texts']['page']
-video_extensions = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"]
 
 def logo_area():
     placeholder_column, logo_column = st.columns([2,1])
@@ -182,6 +181,8 @@ def main():
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
         #Create two columns for Language & Translation Settings
         language_column, translation_column, diarization_column, model_column  = st.columns([1, 1, 1, 1])  # Adjust width ratios if needed
+        #Create two columns for subtitles & summary generation
+        subtitle_column, summary_column = st.columns([1, 1])
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
@@ -195,14 +196,19 @@ def main():
         #Model Selection Area
         with model_column:
             transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'], help=texts_from_config_file['highest_speed_tip'])
+        #Subtitle Setting Area
+        with subtitle_column:
+            subtitle_setting = st.selectbox("Untertitel generieren", options=[texts_from_config_file['no'], texts_from_config_file['yes']])
+        #Summary Setting Area
+        with summary_column:
+            summary_setting = st.selectbox("Zusammenfassung generieren",  options=[texts_from_config_file['no'], texts_from_config_file['yes']])
+
         #Upload section
         uploaded_file = st.file_uploader(
             label=texts_from_config_file['select_file'],
             disabled=any([st.session_state.disabled, data_protection_agreed != True]),
             type=mws_helpers.get_acceptable_format_extensions()
         )
-
-        subtitle_setting = st.checkbox("Untertitel generieren", value=False)
 
         submit_button = st.form_submit_button(
             label=texts_from_config_file['send_file'],
@@ -240,7 +246,7 @@ def main():
                 diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
 
                 # Subtitle Setting
-                subtitle_setting = "1" if subtitle_setting else "0"
+                subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
 
                 #Obtain transcription model code
                 transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
