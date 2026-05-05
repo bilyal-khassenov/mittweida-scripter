@@ -197,7 +197,7 @@ def main():
             transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'], help=texts_from_config_file['highest_speed_tip'])
         #Subtitle Setting Area
         with subtitle_column:
-            subtitle_setting = st.selectbox("Untertitel generieren", options=[texts_from_config_file['no'], texts_from_config_file['yes']])
+            subtitle_setting = st.selectbox(texts_from_config_file['subtitle_selectbox_label'], options=[texts_from_config_file['no'], texts_from_config_file['yes']])
 
         #Upload section
         uploaded_file = st.file_uploader(
