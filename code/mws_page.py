@@ -181,8 +181,8 @@ def main():
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
         #Create two columns for Language & Translation Settings
         language_column, translation_column, diarization_column, model_column  = st.columns([1, 1, 1, 1])  # Adjust width ratios if needed
-        #Create two columns for subtitles & summary generation
-        subtitle_column, summary_column = st.columns([1, 1])
+        # Create two columns for subtitles & summary generation
+        subtitle_column, _, _, _ = st.columns([1, 1, 1, 1])
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
@@ -199,9 +199,6 @@ def main():
         #Subtitle Setting Area
         with subtitle_column:
             subtitle_setting = st.selectbox("Untertitel generieren", options=[texts_from_config_file['no'], texts_from_config_file['yes']])
-        #Summary Setting Area
-        with summary_column:
-            summary_setting = st.selectbox("Zusammenfassung generieren",  options=[texts_from_config_file['no'], texts_from_config_file['yes']])
 
         #Upload section
         uploaded_file = st.file_uploader(
