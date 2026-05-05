@@ -19,3 +19,6 @@ resources/mws_whisper.service
 
 #Ignore file for local tests
 code/tests.py
+
+# idea folder, uncomment if you don't need it
+/.idea/

@@ -180,6 +180,8 @@ def main():
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
         #Create two columns for Language & Translation Settings
         language_column, translation_column, diarization_column, model_column  = st.columns([1, 1, 1, 1])  # Adjust width ratios if needed
+        # Create two columns for subtitles & summary generation
+        subtitle_column, _, _, _ = st.columns([1, 1, 1, 1])
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
@@ -193,9 +195,21 @@ def main():
         #Model Selection Area
         with model_column:
             transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'], help=texts_from_config_file['highest_speed_tip'])
+        #Subtitle Setting Area
+        with subtitle_column:
+            subtitle_setting = st.selectbox("Untertitel generieren", options=[texts_from_config_file['no'], texts_from_config_file['yes']])
+
         #Upload section
-        uploaded_file = st.file_uploader(label = texts_from_config_file['select_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]), type=mws_helpers.get_acceptable_format_extensions())
-        submit_button = st.form_submit_button(label=texts_from_config_file['send_file'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
+        uploaded_file = st.file_uploader(
+            label=texts_from_config_file['select_file'],
+            disabled=any([st.session_state.disabled, data_protection_agreed != True]),
+            type=mws_helpers.get_acceptable_format_extensions()
+        )
+
+        submit_button = st.form_submit_button(
+            label=texts_from_config_file['send_file'],
+            disabled=any([st.session_state.disabled, data_protection_agreed != True])
+        )
 
     #Action on submitting
     if submit_button:
@@ -229,19 +243,23 @@ def main():
                 translation_setting = "1" if translation_setting == texts_from_config_file['yes'] else "0"
                 #Obtain Diarizatin Setting
                 diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
+
+                # Subtitle Setting
+                subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
+
                 #Obtain transcription model code
                 transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
                 #Combine file name from compenents
-                plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[0:120]
+                plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{subtitle_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[0:120]
                 plain_structured_original_file_name = plain_structured_original_file_name_stem + file_extension_of_originally_uploaded_file
-                #Obfuscated 
+                #Obfuscated
                 obfuscated_filename_stem = mws_helpers.obfuscate_string(plain_structured_original_file_name_stem)
                 #Prepare paths
                 file_extension_of_originally_uploaded_file = pathlib.Path(dir_orig_files_temps, uploaded_file.name).suffix
                 #obfuscated_original_file_fullpath = pathlib.Path(dir_orig_files_temps, obfuscated_original_file_name_stem + format_suffix_of_user_uploaded_file)
                 #obfuscated_encrypted_file_fullpath_enc_postfix = pathlib.Path(dir_orig_files_temps, obfuscated_filename_stem + ".enc")
                 obfuscated_file_fullpath_orig_postfix = pathlib.Path(dir_orig_files_temps, obfuscated_filename_stem + file_extension_of_originally_uploaded_file)
-                
+
                 #Get bytes of uploaded file
                 uploaded_file_bytes = uploaded_file.getvalue()
 
