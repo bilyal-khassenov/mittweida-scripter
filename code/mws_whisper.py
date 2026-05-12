@@ -128,7 +128,7 @@ def summarize_file(input_data, original_file_path):
     print("Summary: \n" + final_text)
     return summary_path
 
-def transcribe_file(current_file_location_fullname, full_name):
+def transcribe_file(current_file_location_fullname):
     try:
 
         #Remember start time of the transcription process
@@ -140,17 +140,19 @@ def transcribe_file(current_file_location_fullname, full_name):
         #Update the path
         current_file_location_fullname = file_in_in_progress_folder_fullname
 
-        #Extract Language Code from Base Name
-        language_code = mws_helpers.get_language_setting_index_or_code(int(os.path.basename(current_file_location_fullname).split('#', 7)[3]))
-        #Extract Translation Status from Base Name
-        translation_status = int(os.path.basename(current_file_location_fullname).split('#', 7)[4])
+        # Extract Language Code from Base Name
+        language_code = mws_helpers.get_language_setting_index_or_code(
+            int(os.path.basename(current_file_location_fullname).split('#', 8)[3]))
+        # Extract Translation Status from Base Name
+        translation_status = int(os.path.basename(current_file_location_fullname).split('#', 8)[4])
         translation_status = 'translate' if translation_status == 1 else None
-        #Extract Diarization Setting form Base Name
-        diarization_setting = int(os.path.basename(current_file_location_fullname).split('#', 7)[5])
-        #Extract Selected Transcription Model from Base Name
-        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(os.path.basename(current_file_location_fullname).split('#', 7)[6]))
-        #Extract summary setting from base name
-        summary_setting = int(os.path.basename(full_name).split('#', 7)[6])
+        # Extract Diarization Setting form Base Name
+        diarization_setting = int(os.path.basename(current_file_location_fullname).split('#', 8)[5])
+        # Extract Selected Transcription Model from Base Name
+        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(
+            int(os.path.basename(current_file_location_fullname).split('#', 8)[7]))
+        # Extract summary setting from base name
+        summary_setting = int(os.path.basename(current_file_location_fullname).split('#', 8)[6])
 
         #Retrieve data for protocol
         file_duration = MP3(current_file_location_fullname).info.length
@@ -366,7 +368,7 @@ def process_file(fullname_of_next_unprocessed_file):
         loop_start_time = time.time()
 
         #Start transcription
-        transcription_result_paths = transcribe_file(standardized_audiofile, fullname_of_next_unprocessed_file)
+        transcription_result_paths = transcribe_file(standardized_audiofile)
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
         summary_file = transcription_result_paths[2]
@@ -383,8 +385,8 @@ def process_file(fullname_of_next_unprocessed_file):
             email_text = configs['texts']['whisper']['email_text_one_file']
 
         #Extract Email Address and File Name from Base Name (Last Path Component)
-        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 7)[2]
-        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 7)[7]
+        email_address = os.path.basename(transcript_text_only_file_fullname).split('#', 8)[2]
+        file_name = os.path.basename(transcript_text_only_file_fullname).split('#', 8)[8]
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
