@@ -64,24 +64,19 @@ def transcribe_file(obfuscated_standardized_fullpath):
 
         #Extract Language Code
         language_code = mws_helpers.get_language_setting_index_or_code(int(structured_filename.split('#', 8)[3]))
-        print(language_code)
         #Extract Translation Status
         translation_status = int(structured_filename.split('#', 8)[4])
-        print(translation_status)
         translation_status = 'translate' if translation_status == 1 else None
         #Extract Diarization Setting
         diarization_setting = int(structured_filename.split('#', 8)[5])
-        print(diarization_setting)
         #Extract Selected Transcription Model
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(structured_filename.split('#', 8)[7]))
-        print(selected_transcription_model)
 
         file_duration = MP3(obfuscated_standardized_fullpath).info.length
         file_size = os.path.getsize(obfuscated_standardized_fullpath)
 
         #Extract subtitle Setting from Base Name
         subtitle_setting = int(os.path.basename(structured_filename).split('#', 8)[6])
-        print(subtitle_setting)
         #Load the model
         print("Loading Whisper...")
         if torch.cuda.is_available():
@@ -347,9 +342,7 @@ def process_file(obfuscated_encrypted_fullpath):
         #Extract Email Address and File Name from Base Name (Last Path Component)
         clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
         email_address = clarified_stem.split('#', 8)[2]
-        print(email_address)
         file_name = clarified_stem.split('#', 8)[8]
-        print(file_name)
 
         #Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
