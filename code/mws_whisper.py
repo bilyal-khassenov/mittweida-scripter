@@ -1,5 +1,5 @@
 # Import main packages
-import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback
+import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback, json, tiktoken
 from mutagen.mp3 import MP3
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
@@ -7,7 +7,7 @@ from docx.shared import Pt
 from whisper.utils import get_writer
 from ollama import chat
 from concurrent.futures import ThreadPoolExecutor
-import tiktoken
+from pathlib import Path
 ######from docx.document import Document #Keep it for Intellisense!
 
 # Import helper functions
@@ -75,21 +75,23 @@ def chunk_text_tokens(text, max_tokens=2000):
     return chunks
 
 
-def summarize_chunk(text, compression=0.2):
+def summarize_chunk(text, prompt_hint, summary_language, compression=0.2):
     nwords_summary = max(150, int(compression * word_count(text)))
-    print("Anzahl der Wörter: ")
+    print("Anzahl der WÃ¶rter: ")
     print(nwords_summary)
 
     prompt = (
         f"Your goal is to summarize the given text in maximum {nwords_summary} words. "
         "Extract only the most important information. "
-        "Only output the summary without any additional text. Answer in german only."
+        f"Only output the summary without any additional text. Answer in {summary_language} only. "
     )
 
+    system_prompt = prompt + prompt_hint
+
     response = chat(
-        model='qwen3.5:4b',
+        model='gemma4:e4b',
         messages=[
-            {"role": "system", "content": prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
         ]
     )
@@ -97,7 +99,7 @@ def summarize_chunk(text, compression=0.2):
     return response['message']['content']
 
 
-def hierarchical_reduce(texts: list[str], group_size=5, compression=0.3, max_workers=4):
+def hierarchical_reduce(texts, prompt_hint, summary_language, group_size=5, compression=0.3, max_workers=4):
     while len(texts) > 1:
         groups = [texts[i:i + group_size] for i in range(0, len(texts), group_size)]
 
@@ -112,7 +114,7 @@ def hierarchical_reduce(texts: list[str], group_size=5, compression=0.3, max_wor
         if tasks:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
-                    executor.submit(summarize_chunk, text, compression): idx
+                    executor.submit(summarize_chunk, text, prompt_hint, summary_language, compression): idx
                     for idx, text in tasks
                 }
                 for future in futures:
@@ -124,14 +126,15 @@ def hierarchical_reduce(texts: list[str], group_size=5, compression=0.3, max_wor
     return texts[0]
 
 
-def summarize_file(input_data, original_file_path):
+def summarize_file(input_data, original_file_path, prompt_hint, summary_language):
+    final_text = ""
     chunks = chunk_text_tokens(input_data, max_tokens=2000)
     print(f"Chunks: {len(chunks)}")
 
     if len(chunks) == 1:
-        return summarize_chunk(chunks[0], compression=0.3)
-
-    final_text = hierarchical_reduce(chunks, group_size=5, compression=0.3)
+        final_text = summarize_chunk(chunks[0], prompt_hint, summary_language, compression=0.3)
+    else:
+        final_text = hierarchical_reduce(chunks, prompt_hint, summary_language, group_size=5, compression=0.3)
     new_file_name_stem = pathlib.Path(original_file_path).stem
     summary_path = os.path.join(dir_processed, new_file_name_stem + "_summary.docx")
     document = Document()
@@ -141,34 +144,35 @@ def summarize_file(input_data, original_file_path):
     return summary_path
 
 
-def transcribe_file(obfuscated_standardized_fullpath):
+def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
     try:
 
         # Remember start time of the transcription process
         transcription_start_time = time.time()
 
-        #Clarify obfuscated filename stem
+        # Clarify obfuscated filename stem
         obfuscated_stem = pathlib.Path(obfuscated_standardized_fullpath).stem
         structured_filename = mws_helpers.clarify_string(obfuscated_stem)
 
-        #Extract Language Code
+        # Extract Language Code
         language_code = mws_helpers.get_language_setting_index_or_code(int(structured_filename.split('#', 9)[3]))
-        #Extract Translation Status
+        # Extract Translation Status
         translation_status = int(structured_filename.split('#', 9)[4])
         translation_status = 'translate' if translation_status == 1 else None
-        #Extract Diarization Setting
+        # Extract Diarization Setting
         diarization_setting = int(structured_filename.split('#', 9)[5])
-        #Extract Selected Transcription Model
-        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(structured_filename.split('#', 9)[8]))
+        # Extract Selected Transcription Model
+        selected_transcription_model = mws_helpers.get_model_setting_index_or_name(
+            int(structured_filename.split('#', 9)[8]))
 
         file_duration = MP3(obfuscated_standardized_fullpath).info.length
         file_size = os.path.getsize(obfuscated_standardized_fullpath)
 
-        #Extract subtitle Setting from Base Name
+        # Extract subtitle Setting from Base Name
         subtitle_setting = int(os.path.basename(structured_filename).split('#', 9)[6])
 
         summary_setting = int(os.path.basename(structured_filename).split('#', 9)[7])
-        #Load the model
+        # Load the model
         print("Loading Whisper...")
         if torch.cuda.is_available():
             whisper_model = whisper.load_model(
@@ -176,16 +180,16 @@ def transcribe_file(obfuscated_standardized_fullpath):
         else:
             whisper_model = whisper.load_model(selected_transcription_model)  # CUDA not available
 
-        #Transcribe
+        # Transcribe
         print(f"Transcription starts for {obfuscated_standardized_fullpath}...")
-        result = whisper_model.transcribe(str(obfuscated_standardized_fullpath), verbose=True, word_timestamps=True, language=language_code, task=translation_status)
+        result = whisper_model.transcribe(str(obfuscated_standardized_fullpath), verbose=True, word_timestamps=True,
+                                          language=language_code, task=translation_status)
 
         # Create subtitles if requested
         subtitle_srt_file = None
         subtitle_vtt_file = None
 
         if subtitle_setting == 1:
-
             srt_writer = get_writer("srt", dir_processed)
             srt_writer(result, structured_filename)
 
@@ -195,15 +199,24 @@ def transcribe_file(obfuscated_standardized_fullpath):
             subtitle_srt_file = os.path.join(dir_processed, pathlib.Path(structured_filename).stem + ".srt")
             subtitle_vtt_file = os.path.join(dir_processed, pathlib.Path(structured_filename).stem + ".vtt")
 
-        #Prepare full name and create document
-        #new_file_name_stem = pathlib.Path(standardized_mp3_bytes).stem
+        # Prepare full name and create document
+        # new_file_name_stem = pathlib.Path(standardized_mp3_bytes).stem
         print("Creating Word Document...")
-        transcript_text_only_file_fullname = os.path.join(dir_processed, obfuscated_stem + configs['texts']['whisper']['text_only_attachment_postfix'] + '.docx')
+        transcript_text_only_file_fullname = os.path.join(dir_processed, obfuscated_stem + configs['texts']['whisper'][
+            'text_only_attachment_postfix'] + '.docx')
         # Create summary if requested
         summary_file = None
         if summary_setting == 1:
+            prompt_hint = ""
+            summary_language = ""
+            if sidecar_path.exists():
+                with open(sidecar_path, 'r', encoding='utf-8') as f:
+                    sidecar = json.load(f)
+            prompt_hint = sidecar.get("prompt_hint", "")
+            summary_language = sidecar.get("summary_language", "")
             print("Creating summary...")
-            summary_file = summarize_file(result["text"], structured_filename)
+            summary_file = summarize_file(result["text"], transcript_text_only_file_fullname, prompt_hint,
+                                          summary_language)
 
         # Prepare full name and create document
         new_file_name_stem = pathlib.Path(structured_filename).stem
@@ -224,7 +237,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
         confidence_high_run = document_text_only.add_paragraph().add_run(
             f"Hohes Konfidenzniveau (> {high_confidence_level_lower_bound}): Text wird nicht farblich hervorgehoben.")
         confidence_average_run = document_text_only.add_paragraph().add_run(
-            f"Mittleres Konfidenzniveau ({average_confidence_level_lower_bound} â‰¤ Wert â‰¤ {high_confidence_level_lower_bound}): Text wird gelb hervorgehoben.")
+            f"Mittleres Konfidenzniveau ({average_confidence_level_lower_bound} Ã¢â€°Â¤ Wert Ã¢â€°Â¤ {high_confidence_level_lower_bound}): Text wird gelb hervorgehoben.")
         confidence_average_run.font.highlight_color = WD_COLOR_INDEX.YELLOW
         confidence_low_run = document_text_only.add_paragraph().add_run(
             f"Niedriges Konfidenzniveau (< {average_confidence_level_lower_bound}): Text wird rot hervorgehoben.")
@@ -263,7 +276,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
         # Perform diarization conditionally
         if diarization_setting == 1:
             conversation_turns_diarized = diarize_file(obfuscated_standardized_fullpath)
-            #Normalize diarized turns
+            # Normalize diarized turns
             normalized_and_diarized_turns = []
             counterchecked_turns = []
             processed_turns_indexes = []
@@ -309,8 +322,11 @@ def transcribe_file(obfuscated_standardized_fullpath):
                 if len(timestamp) == 7:
                     timestamp = timestamp + '.00'
                 return timestamp
-            transcript_conversation_turns_file_fullname = os.path.join(dir_processed, obfuscated_stem + configs['texts']['whisper']['conversation_turns_attachment_postfix'] +  '.docx')
-            #Create Docx file
+
+            transcript_conversation_turns_file_fullname = os.path.join(dir_processed,
+                                                                       obfuscated_stem + configs['texts']['whisper'][
+                                                                           'conversation_turns_attachment_postfix'] + '.docx')
+            # Create Docx file
             document_conversation_turns = Document()
             # Change Docx Settings
             style = document_conversation_turns.styles['Normal']
@@ -331,10 +347,10 @@ def transcribe_file(obfuscated_standardized_fullpath):
         else:
             transcript_conversation_turns_file_fullname = None
 
-        #Delete the original file
+        # Delete the original file
         pathlib.Path.unlink(obfuscated_standardized_fullpath)
-        
-        #Get ending time of the transcription
+
+        # Get ending time of the transcription
         transcription_end_time = time.time()
         # Prepare new line for the performance stats
         language_code_for_protocol = '--' if language_code is None else language_code
@@ -358,7 +374,8 @@ def transcribe_file(obfuscated_standardized_fullpath):
         result = pandas.concat([perf_protocol, new_perf_record_df])
         # Save new state of the protocol
         result.to_csv(path_to_perf_protocol, encoding='Windows-1252', index=False)
-        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, file_duration, file_size, subtitle_vtt_file, subtitle_srt_file, summary_file]
+        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, file_duration,
+                file_size, subtitle_vtt_file, subtitle_srt_file, summary_file]
 
     except Exception as e:
         # Get exception infos
@@ -367,8 +384,8 @@ def transcribe_file(obfuscated_standardized_fullpath):
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
         print(error_message_for_admins)
-        
-        #Delete the encrypted file - to-do for later: sending error message to mail address of user whose files resulted in error?
+
+        # Delete the encrypted file - to-do for later: sending error message to mail address of user whose files resulted in error?
         try:
             pathlib.Path.unlink(obfuscated_standardized_fullpath)
             print("File deleted successfully.")
@@ -378,53 +395,58 @@ def transcribe_file(obfuscated_standardized_fullpath):
             print("Error: You do not have permission to delete this file.")
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
-        #Delete the decrypted file
+        # Delete the decrypted file
 
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
                                               f"({getpass.getuser()}) File that resulted in error has been deleted")
 
+
 def get_decrypted_bytes(enc_file_fullpath):
     from cryptography.fernet import Fernet
-    #Get key
+    # Get key
     key = mws_helpers.get_encryption_key()
     fernet = Fernet(key)
-    #Read the encrypted bytes from the file
+    # Read the encrypted bytes from the file
     with open(enc_file_fullpath, "rb") as enc_file:
         encrypted_bytes = enc_file.read()
-    #Decrypt the bytes
+    # Decrypt the bytes
     decrypted_bytes = fernet.decrypt(encrypted_bytes)
     return decrypted_bytes
 
+
 def process_file(obfuscated_encrypted_fullpath):
+    file_path = Path(obfuscated_encrypted_fullpath)
+    sidecar_path = file_path.with_suffix('.json')
+
     import ffmpeg
-    #Prepare fullpath for Conversion Fodler
+    # Prepare fullpath for Conversion Fodler
     new_location_fullpath = os.path.join(dir_format_conversion, pathlib.Path(obfuscated_encrypted_fullpath).name)
-    #Move original file to the conversion folder
+    # Move original file to the conversion folder
     os.replace(obfuscated_encrypted_fullpath, new_location_fullpath)
     obfuscated_encrypted_fullpath = new_location_fullpath
     obfuscated_filename_stem = pathlib.Path(obfuscated_encrypted_fullpath).stem
     try:
-        #First standardize file to mp3
+        # First standardize file to mp3
         decrypted_original_file_bytes = get_decrypted_bytes(obfuscated_encrypted_fullpath)
         # Overwrite same file with decrypted data
         with open(obfuscated_encrypted_fullpath, "wb") as f:
             f.write(decrypted_original_file_bytes)
         obfuscated_decrypted_fullpath = obfuscated_encrypted_fullpath
 
-        #Write a standardized mp3 file
+        # Write a standardized mp3 file
         obfuscated_standardized_fullpath = pathlib.Path(dir_in_progress, obfuscated_filename_stem + '.mp3')
         stream = ffmpeg.input(obfuscated_decrypted_fullpath)
         stream = ffmpeg.output(stream, str(obfuscated_standardized_fullpath))
         ffmpeg.run(stream)
-        #Delete original file
+        # Delete original file
         pathlib.Path.unlink(obfuscated_decrypted_fullpath)
 
-        #Get starting time
+        # Get starting time
         loop_start_time = time.time()
 
-        #Start transcription
-        transcription_result_paths = transcribe_file(obfuscated_standardized_fullpath)
+        # Start transcription
+        transcription_result_paths = transcribe_file(obfuscated_standardized_fullpath, sidecar_path)
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
         duration_seconds = transcription_result_paths[2]
@@ -433,15 +455,15 @@ def process_file(obfuscated_encrypted_fullpath):
         subtitle_srt_file = transcription_result_paths[5]
         summary_file = transcription_result_paths[6]
 
-        #Gather file info for message
-        if not duration_seconds:    # Safely get duration
+        # Gather file info for message
+        if not duration_seconds:  # Safely get duration
             duration_minutes = 0
             message_text_for_later = "Could not read duration for file"
         else:
             duration_minutes = round(duration_seconds / 60, 2)
             message_text_for_later = f"{duration_minutes} min. long"
 
-        #Get finish time
+        # Get finish time
         loop_finish_time = time.time()
         elapsed_time = loop_finish_time - loop_start_time
         time_used_to_transcribe = str(datetime.timedelta(seconds=elapsed_time))
@@ -452,7 +474,7 @@ def process_file(obfuscated_encrypted_fullpath):
         else:
             email_text = configs['texts']['whisper']['email_text_one_file']
 
-        #Extract Email Address and File Name from Base Name (Last Path Component)
+        # Extract Email Address and File Name from Base Name (Last Path Component)
         clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
         email_address = clarified_stem.split('#', 8)[2]
         file_name = clarified_stem.split('#', 9)[9]
@@ -484,17 +506,32 @@ def process_file(obfuscated_encrypted_fullpath):
             )
 
         if summary_file is not None:
-            attachments.append(summary_file)
+            attachments.append(
+                (
+                    summary_file,
+                    f"{file_name}{configs['texts']['whisper']['summary_attachment_postfix']}.docx"
+                )
+            )
 
         # Send the results of transcribing
         # Subtitle files (optional)
         if subtitle_srt_file is not None:
-            attachments.append(subtitle_srt_file)
+            attachments.append(
+                (
+                    subtitle_srt_file,
+                    f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.srt"
+                )
+            )
 
         if subtitle_vtt_file is not None:
-            attachments.append(subtitle_vtt_file)
+            attachments.append(
+                (
+                    subtitle_vtt_file,
+                    f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.vtt"
+                )
+            )
 
-        #Send the results of transcribing
+        # Send the results of transcribing
         try:
             mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text,
                                   attachments)
@@ -509,21 +546,23 @@ def process_file(obfuscated_encrypted_fullpath):
                 mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
             # Copy transcription results to local testings folder
             if transcript_conversation_turns_file_fullname is not None:
-                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, subtitle_vtt_file, subtitle_srt_file, summary_file]
+                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname,
+                              subtitle_vtt_file, subtitle_srt_file, summary_file]
             else:
                 files_list = [transcript_text_only_file_fullname, subtitle_vtt_file, subtitle_srt_file, summary_file]
             #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
             for results_file in files_list:
-                try:
-                    # Copy the file
-                    shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path,
-                                                           os.path.basename(results_file)))
-                except FileNotFoundError:
-                    print("Source file not found!")
-                except PermissionError:
-                    print("Permission denied!")
-                except Exception as e:
-                    print(f"An error occurred: {e}")
+                if results_file is not None:
+                    try:
+                        # Copy the file
+                        shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path,
+                                                               os.path.basename(results_file)))
+                    except FileNotFoundError:
+                        print("Source file not found!")
+                    except PermissionError:
+                        print("Permission denied!")
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
 
         # Delete Word files after sending them
         pathlib.Path.unlink(transcript_text_only_file_fullname)
@@ -539,13 +578,17 @@ def process_file(obfuscated_encrypted_fullpath):
         # pathlib.Path.unlink(transcript_text_only_file_fullname)
         # if transcript_conversation_turns_file_fullname is not None:
         #     pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
-        #Send notification
+        # Send notification
 
         if summary_file is not None and os.path.exists(summary_file):
             pathlib.Path.unlink(summary_file)
+
+        if sidecar_path.exists():
+            sidecar_path.unlink()
         # Send notification
         if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], f'({getpass.getuser()}) - A file has been successfully transcribed ({message_text_for_later})')
+            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
+                                              f'({getpass.getuser()}) - A file has been successfully transcribed ({message_text_for_later})')
     except Exception as e:
         # Get exception infos
         error_string = traceback.format_exc()

@@ -1,6 +1,7 @@
 import pathlib, os, json
 from typing import Literal
 
+
 class ProjectPaths:
     def __init__(self):
         self.project_folder_path = pathlib.Path(__file__).parent.parent
@@ -10,12 +11,13 @@ class ProjectPaths:
         self.uploads_path = os.path.join(self.code_path.parent, 'uploads')
         self.temp_orig_file_path = os.path.join(self.uploads_path, '0_temp_orig_file')
         self.folder_for_format_conversion_path = os.path.join(self.uploads_path, '1_format_conversion')
-        #self.unprocessed_folder_path = os.path.join(self.uploads_path, '2_unprocessed')
+        # self.unprocessed_folder_path = os.path.join(self.uploads_path, '2_unprocessed')
         self.in_progress_folder_path = os.path.join(self.uploads_path, '2_in_progress')
         self.processed_folder_path = os.path.join(self.uploads_path, '3_processed')
         self.local_tests_folder_path = os.path.join(self.uploads_path, '4_local_tests')
         self.uploads_protocol_fullfilename = os.path.join(self.stats_path, 'protocol.csv')
         self.performance_protocol_fullfilename = os.path.join(self.stats_path, 'performance.csv')
+
 
 def get_acceptable_format_extensions():
     return [
@@ -28,22 +30,38 @@ def get_acceptable_format_extensions():
         '.rf64', '.sln', '.tta', '.voc', '.vox', '.wav', '.wma', '.wv', '.webm', '.8svx', '.cda'
     ]
 
+
 def get_whisper_language_codes():
-    return {"en": "english", "zh": "chinese", "de": "german", "es": "spanish", "ru": "russian", "ko": "korean", "fr": "french",
-            "ja": "japanese", "pt": "portuguese", "tr": "turkish", "pl": "polish", "ca": "catalan", "nl": "dutch", "ar": "arabic",
-            "sv": "swedish", "it": "italian", "id": "indonesian", "hi": "hindi", "fi": "finnish", "vi": "vietnamese", "he": "hebrew",
-            "uk": "ukrainian", "el": "greek", "ms": "malay", "cs": "czech", "ro": "romanian", "da": "danish", "hu": "hungarian",
-            "ta": "tamil", "no": "norwegian", "th": "thai", "ur": "urdu", "hr": "croatian", "bg": "bulgarian","lt": "lithuanian",
-            "la": "latin", "mi": "maori", "ml": "malayalam", "cy": "welsh", "sk": "slovak", "te": "telugu", "fa": "persian",
-            "lv": "latvian", "bn": "bengali", "sr": "serbian", "az": "azerbaijani", "sl": "slovenian", "kn": "kannada", "et": "estonian",
-            "mk": "macedonian", "br": "breton", "eu": "basque", "is": "icelandic", "hy": "armenian", "ne": "nepali", "mn": "mongolian",
-            "bs": "bosnian", "kk": "kazakh", "sq": "albanian", "sw": "swahili", "gl": "galician", "mr": "marathi", "pa": "punjabi",
-            "si": "sinhala", "km": "khmer", "sn": "shona", "yo": "yoruba", "so": "somali", "af": "afrikaans", "oc": "occitan",
-            "ka": "georgian", "be": "belarusian", "tg": "tajik", "sd": "sindhi", "gu": "gujarati", "am": "amharic", "yi": "yiddish",
-            "lo": "lao", "uz": "uzbek", "fo": "faroese", "ht": "haitian creole", "ps": "pashto", "tk": "turkmen", "nn": "nynorsk",
-            "mt": "maltese", "sa": "sanskrit", "lb": "luxembourgish", "my": "myanmar", "bo": "tibetan", "tl": "tagalog", "mg": "malagasy",
-            "as": "assamese", "tt": "tatar", "haw": "hawaiian", "ln": "lingala", "ha": "hausa", "ba": "bashkir", "jw": "javanese",
+    return {"en": "english", "zh": "chinese", "de": "german", "es": "spanish", "ru": "russian", "ko": "korean",
+            "fr": "french",
+            "ja": "japanese", "pt": "portuguese", "tr": "turkish", "pl": "polish", "ca": "catalan", "nl": "dutch",
+            "ar": "arabic",
+            "sv": "swedish", "it": "italian", "id": "indonesian", "hi": "hindi", "fi": "finnish", "vi": "vietnamese",
+            "he": "hebrew",
+            "uk": "ukrainian", "el": "greek", "ms": "malay", "cs": "czech", "ro": "romanian", "da": "danish",
+            "hu": "hungarian",
+            "ta": "tamil", "no": "norwegian", "th": "thai", "ur": "urdu", "hr": "croatian", "bg": "bulgarian",
+            "lt": "lithuanian",
+            "la": "latin", "mi": "maori", "ml": "malayalam", "cy": "welsh", "sk": "slovak", "te": "telugu",
+            "fa": "persian",
+            "lv": "latvian", "bn": "bengali", "sr": "serbian", "az": "azerbaijani", "sl": "slovenian", "kn": "kannada",
+            "et": "estonian",
+            "mk": "macedonian", "br": "breton", "eu": "basque", "is": "icelandic", "hy": "armenian", "ne": "nepali",
+            "mn": "mongolian",
+            "bs": "bosnian", "kk": "kazakh", "sq": "albanian", "sw": "swahili", "gl": "galician", "mr": "marathi",
+            "pa": "punjabi",
+            "si": "sinhala", "km": "khmer", "sn": "shona", "yo": "yoruba", "so": "somali", "af": "afrikaans",
+            "oc": "occitan",
+            "ka": "georgian", "be": "belarusian", "tg": "tajik", "sd": "sindhi", "gu": "gujarati", "am": "amharic",
+            "yi": "yiddish",
+            "lo": "lao", "uz": "uzbek", "fo": "faroese", "ht": "haitian creole", "ps": "pashto", "tk": "turkmen",
+            "nn": "nynorsk",
+            "mt": "maltese", "sa": "sanskrit", "lb": "luxembourgish", "my": "myanmar", "bo": "tibetan", "tl": "tagalog",
+            "mg": "malagasy",
+            "as": "assamese", "tt": "tatar", "haw": "hawaiian", "ln": "lingala", "ha": "hausa", "ba": "bashkir",
+            "jw": "javanese",
             "su": "sundanese", "yue": "cantonese"}
+
 
 def get_language_setting_index_or_code(value):
     language_codes = get_whisper_language_codes()
@@ -58,6 +76,7 @@ def get_language_setting_index_or_code(value):
     else:
         return keys[value]
 
+
 def get_model_setting_index_or_name(value):
     if isinstance(value, str):
         if value == 'large-v2':
@@ -70,27 +89,30 @@ def get_model_setting_index_or_name(value):
         elif value == 1:
             return 'turbo'
 
+
 def get_configs():
     with open(os.path.join(ProjectPaths().resources_path, 'config.json'), 'r', encoding='utf-8') as config_file:
         configs = json.load(config_file)
     return configs
 
+
 def make_sure_protocols_exist():
-    #Check if Order Protocol exists and if not, create it
+    # Check if Order Protocol exists and if not, create it
     if not os.path.exists(ProjectPaths().uploads_protocol_fullfilename):
         # If not, create the file without writing headers
         with open(ProjectPaths().uploads_protocol_fullfilename, 'w') as file:
             file.write('upload_timestamp,uploader_hash,duration_seconds,file_size,institution\n')
-    #Check if Performance Protocol exists and if not, create it
+    # Check if Performance Protocol exists and if not, create it
     if not os.path.exists(ProjectPaths().performance_protocol_fullfilename):
         # If not, create the file without writing headers
         with open(ProjectPaths().performance_protocol_fullfilename, 'w') as file:
-            file.write('model,duration_seconds,file_size,transcription_start_time,transcription_end_time,transcription_time_per_one_raw_second\n')
+            file.write(
+                'model,duration_seconds,file_size,transcription_start_time,transcription_end_time,transcription_time_per_one_raw_second\n')
+
 
 def send_mail(send_from, send_to, subject, message, files=[],
               server=get_configs()['email']['server'], port=get_configs()['email']['port'], username='', password='',
               use_tls=False):
-
     import smtplib
     from pathlib import Path
     from email.mime.multipart import MIMEMultipart
@@ -136,14 +158,15 @@ def send_mail(send_from, send_to, subject, message, files=[],
     smtp.quit()
     print('Mail sent!')
 
+
 def send_telegram_message(admin_recipients, message_string: str):
     from urllib.parse import quote_plus
     import requests
 
-    #Read configs
+    # Read configs
     configs = get_configs()
 
-    #Check how recipients were provided and transform them to list if needed
+    # Check how recipients were provided and transform them to list if needed
     if not isinstance(admin_recipients, list):
         admin_recipients = [recipient.strip() for recipient in admin_recipients.split(',')]
 
@@ -151,7 +174,8 @@ def send_telegram_message(admin_recipients, message_string: str):
     for admin_recipient in admin_recipients:
         send_text = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage?chat_id={admin_recipient}&parse_mode=Markdown&text={quote_plus(message_string)}&disable_web_page_preview=True"
         response = requests.get(send_text)
-    
+
+
 def get_css_opacity_style_code(style: Literal['grey', 'normal']):
     if style == 'grey':
         grey_style = """<style>
@@ -167,6 +191,7 @@ def get_css_opacity_style_code(style: Literal['grey', 'normal']):
         normal_style = """<style>body, h1, h2, h3, h4, h5, h6, button, span { opacity: 1; }</style>"""
         return normal_style
 
+
 def generate_hash(input_string):
     if input_string is not None:
         import hashlib
@@ -178,10 +203,12 @@ def generate_hash(input_string):
     else:
         return '!!!VALUE NOT PROVIDED!!!'
 
+
 def generate_key():
     from cryptography.fernet import Fernet, InvalidToken
     key = Fernet.generate_key()  # 32-byte URL-safe base64-encoded key
     print(key)
+
 
 def get_encryption_key():
     # Prefer env var for security
@@ -192,6 +219,7 @@ def get_encryption_key():
     if not key:
         raise ValueError("Encryption key not found in env or config!")
     return key.encode()  # Ensure it's bytes
+
 
 def obfuscate_string(name: str) -> str:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -204,6 +232,7 @@ def obfuscate_string(name: str) -> str:
     encryptor = cipher.encryptor()
     ct = encryptor.update(name.encode()) + encryptor.finalize()
     return base64.urlsafe_b64encode(ct).decode("ascii").rstrip("=")
+
 
 def clarify_string(token: str) -> str:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -218,18 +247,22 @@ def clarify_string(token: str) -> str:
     decryptor = cipher.decryptor()
     return (decryptor.update(ct) + decryptor.finalize()).decode()
 
+
 def count_and_list_files(folder_path):
     files = []
     # Initialize counter variables
     files_count = 0
+    excluded_extensions = {'.json', '.gitignore'}
     # Count files in progress
     for path in os.listdir(folder_path):
         file_path = os.path.join(folder_path, path)
-        # Exclude .gitignore and check if it is a file
-        if os.path.isfile(file_path) and path != '.gitignore':
+        # Exclude .gitignore and .json and check if they are files
+        if os.path.isfile(file_path) and path not in excluded_extensions and pathlib.Path(
+                path).suffix.lower() not in excluded_extensions:
             files_count += 1
             files.append(file_path)
     return files_count, files
+
 
 def get_media_info(path):
     import subprocess
