@@ -264,6 +264,20 @@ def count_and_list_files(folder_path):
     return files_count, files
 
 
+def count_and_list_files_maintenance(folder_path):
+    # Initialize counter variables
+    files_count = 0
+    excluded_extensions = {'.gitignore'}
+    # Count files in progress
+    for path in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, path)
+        # Exclude .gitignore and .json and check if they are files
+        if os.path.isfile(file_path) and path not in excluded_extensions and pathlib.Path(
+                path).suffix.lower() not in excluded_extensions:
+            files_count += 1
+    return files_count
+
+
 def get_media_info(path):
     import subprocess
     import json

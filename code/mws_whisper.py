@@ -531,38 +531,38 @@ def process_file(obfuscated_encrypted_fullpath):
                 )
             )
 
-        # Send the results of transcribing
-        try:
-            mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text,
-                                  attachments)
-        except Exception as e:
-            if configs['telegram']['use_telegram'] == True:
-                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
-                                                  f"({getpass.getuser()}) - Transcription was successfull, but an error occured when we tried to send an email")
-            e_type, e_object, e_traceback = sys.exc_info()
-            e_line_number = e_traceback.tb_lineno
-            error_message_for_admins = f"({getpass.getuser()}) - Following error happened when trying to send the email: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
-            if configs['telegram']['use_telegram'] == True:
-                mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
-            # Copy transcription results to local testings folder
-            if transcript_conversation_turns_file_fullname is not None:
-                files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname,
-                              subtitle_vtt_file, subtitle_srt_file, summary_file]
-            else:
-                files_list = [transcript_text_only_file_fullname, subtitle_vtt_file, subtitle_srt_file, summary_file]
-            #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
-            for results_file in files_list:
-                if results_file is not None:
-                    try:
-                        # Copy the file
-                        shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path,
-                                                               os.path.basename(results_file)))
-                    except FileNotFoundError:
-                        print("Source file not found!")
-                    except PermissionError:
-                        print("Permission denied!")
-                    except Exception as e:
-                        print(f"An error occurred: {e}")
+        # # Send the results of transcribing
+        # try:
+        #     mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text,
+        #                           attachments)
+        # except Exception as e:
+        #     if configs['telegram']['use_telegram'] == True:
+        #         mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
+        #                                           f"({getpass.getuser()}) - Transcription was successfull, but an error occured when we tried to send an email")
+        #     e_type, e_object, e_traceback = sys.exc_info()
+        #     e_line_number = e_traceback.tb_lineno
+        #     error_message_for_admins = f"({getpass.getuser()}) - Following error happened when trying to send the email: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
+        #     if configs['telegram']['use_telegram'] == True:
+        #         mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
+        #     # Copy transcription results to local testings folder
+        #     if transcript_conversation_turns_file_fullname is not None:
+        #         files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname,
+        #                       subtitle_vtt_file, subtitle_srt_file, summary_file]
+        #     else:
+        #         files_list = [transcript_text_only_file_fullname, subtitle_vtt_file, subtitle_srt_file, summary_file]
+        #     #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
+        #     for results_file in files_list:
+        #         if results_file is not None:
+        #             try:
+        #                 # Copy the file
+        #                 shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path,
+        #                                                        os.path.basename(results_file)))
+        #             except FileNotFoundError:
+        #                 print("Source file not found!")
+        #             except PermissionError:
+        #                 print("Permission denied!")
+        #             except Exception as e:
+        #                 print(f"An error occurred: {e}")
 
         # Delete Word files after sending them
         pathlib.Path.unlink(transcript_text_only_file_fullname)
@@ -600,8 +600,10 @@ def process_file(obfuscated_encrypted_fullpath):
 def main():
     from multiprocessing import Process
 
+    count_temp_orig_files = 1
+
     # Infinite Loop
-    while 1 < 2:
+    while count_temp_orig_files > 0:
         # Define seconds to sleep
         seconds = 10
         # If there are less than 2 videos currently in progress, then check if there are any new uploaded files to start new transcription process
@@ -609,6 +611,7 @@ def main():
         if count_files_in_proggress < configs['features']['max_files_processed_simultaneously']:
             # List unprocessed files
             count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_temp_orig_files)
+            count_temp_orig_files = mws_helpers.count_and_list_files_maintenance(dir_temp_orig_files)
 
             # Get the name of the next unprocessed file
             if count_unprocessed >= 1:
