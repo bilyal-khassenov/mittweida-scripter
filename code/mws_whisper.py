@@ -1,6 +1,6 @@
 #Import main packages
 import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback
-from mutagen.mp3 import MP3
+from mutagen.oggopus import OggOpus
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
 from docx.shared import Pt
@@ -18,6 +18,9 @@ dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 dir_processed = mws_helpers.ProjectPaths().processed_folder_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
 configs = mws_helpers.get_configs()
+
+#Maximum length (in seconds) of a single audio section
+max_section_length_seconds = configs['features']['max_section_length_seconds']
 
 def diarize_file(file_path):
     from pyannote.audio import Pipeline
@@ -72,7 +75,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
         #Extract Selected Transcription Model
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(int(structured_filename.split('#', 8)[7]))
 
-        file_duration = MP3(obfuscated_standardized_fullpath).info.length
+        file_duration = OggOpus(obfuscated_standardized_fullpath).info.length
         file_size = os.path.getsize(obfuscated_standardized_fullpath)
 
         #Extract subtitle Setting from Base Name
@@ -256,7 +259,18 @@ def transcribe_file(obfuscated_standardized_fullpath):
         if configs['telegram']['use_telegram'] == True:
             mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
         print(error_message_for_admins)
-        
+
+        #Inform the user by email that the transcription failed
+        try:
+            error_mail_stem = pathlib.Path(obfuscated_standardized_fullpath).stem
+            error_mail_clarified_stem = mws_helpers.clarify_string(error_mail_stem)
+            error_mail_address = error_mail_clarified_stem.split('#', 8)[2]
+            error_email_subject = configs['texts']['whisper']['email_subject_error']
+            error_email_text = configs['texts']['whisper']['email_text_error']
+            mws_helpers.send_mail(configs['email']['noreply_email'], [error_mail_address], error_email_subject, error_email_text)
+        except Exception as error_mail_exception:
+            print(f"Could not send error notification email: {error_mail_exception}")
+
         #Delete the encrypted file - to-do for later: sending error message to mail address of user whose files resulted in error?
         try:
             pathlib.Path.unlink(obfuscated_standardized_fullpath)
@@ -293,18 +307,52 @@ def process_file(obfuscated_encrypted_fullpath):
     obfuscated_encrypted_fullpath = new_location_fullpath
     obfuscated_filename_stem = pathlib.Path(obfuscated_encrypted_fullpath).stem
     try:
-        #First standardize file to mp3
+        #First standardize file to opus
         decrypted_original_file_bytes = get_decrypted_bytes(obfuscated_encrypted_fullpath)
         # Overwrite same file with decrypted data
         with open(obfuscated_encrypted_fullpath, "wb") as f:
             f.write(decrypted_original_file_bytes)
         obfuscated_decrypted_fullpath = obfuscated_encrypted_fullpath
 
-        #Write a standardized mp3 file
-        obfuscated_standardized_fullpath = pathlib.Path(dir_in_progress, obfuscated_filename_stem + '.mp3')
-        stream = ffmpeg.input(obfuscated_decrypted_fullpath)
-        stream = ffmpeg.output(stream, str(obfuscated_standardized_fullpath))
-        ffmpeg.run(stream)
+        #Write a standardized opus file
+        obfuscated_standardized_fullpath = pathlib.Path(dir_in_progress, obfuscated_filename_stem + '.opus')
+
+        #Probe the input duration to decide whether the file must be split
+        probe_info = ffmpeg.probe(obfuscated_decrypted_fullpath)
+        input_duration_seconds = float(probe_info['format']['duration'])
+
+        if input_duration_seconds <= max_section_length_seconds:
+            stream = ffmpeg.input(obfuscated_decrypted_fullpath)
+            stream = ffmpeg.output(stream, str(obfuscated_standardized_fullpath), acodec='libopus')
+            ffmpeg.run(stream)
+        else:
+            section_fullpaths = []
+            section_index = 0
+            section_start_seconds = 0.0
+            while section_start_seconds < input_duration_seconds:
+                section_fullpath = pathlib.Path(dir_in_progress, f"{obfuscated_filename_stem}_section_{section_index}.opus")
+                stream = ffmpeg.input(obfuscated_decrypted_fullpath, ss=section_start_seconds, t=max_section_length_seconds)
+                stream = ffmpeg.output(stream, str(section_fullpath), acodec='libopus')
+                ffmpeg.run(stream)
+                section_fullpaths.append(section_fullpath)
+                section_start_seconds += max_section_length_seconds
+                section_index += 1
+
+            #Build a concat list file referencing every converted section
+            concat_list_fullpath = pathlib.Path(dir_in_progress, f"{obfuscated_filename_stem}_sections.txt")
+            with open(concat_list_fullpath, "w", encoding="utf-8") as concat_list_file:
+                for section_fullpath in section_fullpaths:
+                    concat_list_file.write(f"file '{section_fullpath.as_posix()}'\n")
+
+            #Combine the sections into a single standardized opus file (stream copy, no re-encode)
+            stream = ffmpeg.input(str(concat_list_fullpath), format='concat', safe=0)
+            stream = ffmpeg.output(stream, str(obfuscated_standardized_fullpath), acodec='copy')
+            ffmpeg.run(stream)
+
+            #Clean up the temporary section files and the concat list
+            for section_fullpath in section_fullpaths:
+                pathlib.Path.unlink(section_fullpath)
+            pathlib.Path.unlink(concat_list_fullpath)
         #Delete original file
         pathlib.Path.unlink(obfuscated_decrypted_fullpath)
 
