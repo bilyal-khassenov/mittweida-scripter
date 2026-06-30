@@ -243,7 +243,6 @@ def main():
                 translation_setting = "1" if translation_setting == texts_from_config_file['yes'] else "0"
                 #Obtain Diarizatin Setting
                 diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
-
                 # Subtitle Setting
                 subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
 
@@ -296,6 +295,7 @@ def main():
                                         'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
                                         'translation_status': translation_setting,
                                         'diarization_status': diarization_setting,
+                                        'subtitles_status': subtitle_setting,
                                         'transcription_model': transcription_model}]
 
                 #Register new record - transform it to a dataframe
@@ -330,6 +330,7 @@ def main():
                         f"Transcription Model: {transcription_model}\n"
                         f"Diarization Status: {diarization_setting}\n"
                         f"Translation Status: {translation_setting}\n"
+                        f"Subtitles Status: {subtitle_setting}\n"
                         f"Files Waiting: {count_unprocessed}\n"
                         f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
                     )
