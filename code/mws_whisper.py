@@ -29,6 +29,7 @@ dir_temp_orig_files = mws_helpers.ProjectPaths().temp_orig_file_path
 dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
 dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 dir_processed = mws_helpers.ProjectPaths().processed_folder_path
+dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
 configs = mws_helpers.get_configs()
 
@@ -731,9 +732,14 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         subtitle_vtt_file_fullname = None
 
         # Send notification
+        count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
+        count_in_progress, _ = mws_helpers.count_processing_jobs()
         notify_admins(
             f'({getpass.getuser()}) - A file has been successfully transcribed '
-            f'({message_text_for_later})'
+            f'({message_text_for_later})\n'
+            f"Files Waiting: {count_unprocessed}\n"
+            f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
+
         )
 
     except Exception:
