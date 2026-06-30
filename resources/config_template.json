@@ -73,7 +73,7 @@
             "subtitle_selectbox_label": "Untertitel generieren?",
             "summary_selectbox_label": "Zusammenfassung generieren?",
             "summary_language_selectbox_label": "Sprache der Zusammenfassung",
-            "summary_language_code_selectbox_default_option": "German"
+            "summary_language_code_selectbox_default_option": "English"
         },
         "whisper":{
             "docx_text_only_title": "Transkription - Nur Text",
