@@ -1,4 +1,4 @@
-import pathlib, os, json
+import pathlib, os, json, time, uuid
 from typing import Literal
 
 class ProjectPaths:
@@ -218,17 +218,99 @@ def clarify_string(token: str) -> str:
     decryptor = cipher.decryptor()
     return (decryptor.update(ct) + decryptor.finalize()).decode()
 
+def safe_unlink(file_path, label="file"):
+    """
+    Safely delete a file if it exists.
+    Accepts either str or pathlib.Path.
+    """
+    if file_path is None:
+        return
+
+    try:
+        path = pathlib.Path(file_path)
+
+        if path.exists():
+            path.unlink()
+            print(f"{label} deleted successfully: {path}")
+
+    except FileNotFoundError:
+        print(f"{label} does not exist: {file_path}")
+
+    except PermissionError:
+        print(f"No permission to delete {label}: {file_path}")
+
+    except Exception as e:
+        print(f"Could not delete {label} {file_path}: {e}")
+
+
+def create_processing_marker(source_file_path):
+    """
+    Creates a marker file representing one active processing job.
+    The marker is used for counting active daemon processes.
+    """
+    marker_dir = pathlib.Path(ProjectPaths().in_progress_folder_path)
+    marker_dir.mkdir(parents=True, exist_ok=True)
+
+    source_stem = pathlib.Path(source_file_path).stem
+    marker_name = f"{source_stem}.{uuid.uuid4().hex}.job"
+    marker_path = marker_dir / marker_name
+
+    marker_data = {
+        "source_file": str(source_file_path),
+        "source_stem": source_stem,
+        "created_at": time.time(),
+        "pid": os.getpid()
+    }
+
+    with open(marker_path, "x", encoding="utf-8") as marker_file:
+        json.dump(marker_data, marker_file)
+
+    return str(marker_path)
+
+
+def count_processing_jobs():
+    """
+    Count active processing jobs by counting .job marker files only.
+    This intentionally ignores .opus, .wav, .docx, .srt, .vtt, etc.
+    """
+    marker_dir = pathlib.Path(ProjectPaths().in_progress_folder_path)
+
+    if not marker_dir.exists():
+        return 0, []
+
+    marker_files = []
+
+    for path in marker_dir.iterdir():
+        if path.is_file() and path.suffix.lower() == ".job":
+            marker_files.append(str(path))
+
+    return len(marker_files), marker_files
+
+
+def cleanup_processing_markers():
+    """
+    Removes all old processing markers.
+
+    Use this once when starting/restarting the daemon script.
+    Do NOT call this from the Streamlit page and do NOT call this repeatedly
+    while workers may still be running.
+    """
+    _, marker_files = count_processing_jobs()
+
+    for marker_file in marker_files:
+        safe_unlink(marker_file)
+
 def count_and_list_files(folder_path):
     files = []
-    # Initialize counter variables
     files_count = 0
-    # Count files in progress
+
     for path in os.listdir(folder_path):
         file_path = os.path.join(folder_path, path)
-        # Exclude .gitignore and check if it is a file
+
         if os.path.isfile(file_path) and path != '.gitignore':
             files_count += 1
             files.append(file_path)
+
     return files_count, files
 
 def get_media_info(path):
