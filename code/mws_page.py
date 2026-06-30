@@ -314,14 +314,24 @@ def main():
                     count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
                     count_in_progress, _ = mws_helpers.count_processing_jobs()
 
+                    duration_minutes_for_message = (
+                        round(duration_seconds / 60, 2)
+                        if duration_seconds is not None
+                        else "unknown"
+                    )
+
                     mws_helpers.send_telegram_message(
                         configs['telegram']['admin_chat_id'],
                         f"NEW FILE HAS BEEN UPLOADED\n"
                         f"Machine: {getpass.getuser()}\n"
                         f"Institution: {institution_referer}\n"
-                        f"Duration in Minutes: {round(duration_seconds / 60, 2)}\n"
+                        f"Duration in Minutes: {duration_minutes_for_message}\n"
+                        f"Language Code: {mws_helpers.get_language_setting_index_or_code(language_setting)}\n"
+                        f"Transcription Model: {transcription_model}\n"
+                        f"Diarization Status: {diarization_setting}\n"
+                        f"Translation Status: {translation_setting}\n"
                         f"Files Waiting: {count_unprocessed}\n"
-                        f"Files in Progress: {count_in_progress}"
+                        f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
                     )
                     
                 #Success message for user

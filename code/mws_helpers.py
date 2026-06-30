@@ -137,20 +137,31 @@ def send_mail(send_from, send_to, subject, message, files=[],
     print('Mail sent!')
 
 def send_telegram_message(admin_recipients, message_string: str):
-    from urllib.parse import quote_plus
     import requests
 
-    #Read configs
+    # Read configs
     configs = get_configs()
 
-    #Check how recipients were provided and transform them to list if needed
+    # Check how recipients were provided and transform them to list if needed
     if not isinstance(admin_recipients, list):
-        admin_recipients = [recipient.strip() for recipient in admin_recipients.split(',')]
+        admin_recipients = [
+            recipient.strip()
+            for recipient in admin_recipients.split(',')
+        ]
 
-    # Send message to each recipient
+    url = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage"
+
     for admin_recipient in admin_recipients:
-        send_text = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage?chat_id={admin_recipient}&parse_mode=Markdown&text={quote_plus(message_string)}&disable_web_page_preview=True"
-        response = requests.get(send_text)
+        payload = {
+            "chat_id": admin_recipient,
+            "text": message_string,
+            "disable_web_page_preview": True
+        }
+
+        response = requests.get(url, params=payload)
+
+        if not response.ok:
+            print(f"Telegram message failed: {response.status_code} - {response.text}")
     
 def get_css_opacity_style_code(style: Literal['grey', 'normal']):
     if style == 'grey':
