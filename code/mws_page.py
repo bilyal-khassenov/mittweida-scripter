@@ -179,25 +179,25 @@ def main():
         #E-Mail-Address
         email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
         #Create two columns for Language & Translation Settings
-        language_column, translation_column, diarization_column, model_column  = st.columns([1, 1, 1, 1])  # Adjust width ratios if needed
+        language_column, model_column, diarization_column, subtitle_column, translation_column   = st.columns([1, 1, 1, 1, 1])  # Adjust width ratios if needed
         # Create two columns for subtitles & summary generation
-        subtitle_column, _, _, _ = st.columns([1, 1, 1, 1])
+        #Placeholder for Summarization Area
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
             language_name = st.selectbox(texts_from_config_file['language_code_selectbox_label'], capitalized_languages)
-        #Translation Selection Area
-        with translation_column:
-            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
-        #Diarization Setting Area
-        with diarization_column:
-            diarization_setting = st.selectbox(texts_from_config_file['speaker_assignment_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         #Model Selection Area
         with model_column:
             transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'], help=texts_from_config_file['highest_speed_tip'])
+        #Diarization Setting Area
+        with diarization_column:
+            diarization_setting = st.selectbox(texts_from_config_file['speaker_assignment_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         #Subtitle Setting Area
         with subtitle_column:
             subtitle_setting = st.selectbox(texts_from_config_file['subtitle_selectbox_label'], options=[texts_from_config_file['no'], texts_from_config_file['yes']])
+        #Translation Selection Area
+        with translation_column:
+            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
 
         #Upload section
         uploaded_file = st.file_uploader(
