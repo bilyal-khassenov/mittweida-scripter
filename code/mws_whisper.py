@@ -464,25 +464,6 @@ def transcribe_file(obfuscated_standardized_fullpath):
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
         notify_admins(error_message_for_admins)
 
-        # Inform the user by email that the transcription failed
-        try:
-            error_mail_stem = pathlib.Path(obfuscated_standardized_fullpath).stem
-            error_mail_clarified_stem = mws_helpers.clarify_string(error_mail_stem)
-            error_mail_address = error_mail_clarified_stem.split('#', 8)[2]
-
-            error_email_subject = configs['texts']['whisper']['email_subject_error']
-            error_email_text = configs['texts']['whisper']['email_text_error']
-
-            mws_helpers.send_mail(
-                configs['email']['noreply_email'],
-                [error_mail_address],
-                error_email_subject,
-                error_email_text
-            )
-
-        except Exception as error_mail_exception:
-            print(f"Could not send error notification email: {error_mail_exception}")
-
         # Cleanup temporary files
         mws_helpers.safe_unlink(obfuscated_diarization_wav_fullpath, "temporary diarization WAV file")
         mws_helpers.safe_unlink(obfuscated_standardized_fullpath, "standardized Opus file")
@@ -515,6 +496,7 @@ def get_decrypted_bytes(enc_file_fullpath):
 def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None):
     obfuscated_decrypted_fullpath = None
     obfuscated_standardized_fullpath = None
+    obfuscated_filename_stem = None
 
     transcript_text_only_file_fullname = None
     transcript_conversation_turns_file_fullname = None
@@ -746,6 +728,25 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         error_string = traceback.format_exc()
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
         notify_admins(error_message_for_admins)
+
+        # Inform the user by email that processing failed. This covers all failure
+        # modes (decryption, FFmpeg conversion, transcription)
+        try:
+            error_mail_clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
+            error_mail_address = error_mail_clarified_stem.split('#', 8)[2]
+
+            error_email_subject = configs['texts']['whisper']['email_subject_error']
+            error_email_text = configs['texts']['whisper']['email_text_error']
+
+            mws_helpers.send_mail(
+                configs['email']['noreply_email'],
+                [error_mail_address],
+                error_email_subject,
+                error_email_text
+            )
+
+        except Exception as error_mail_exception:
+            print(f"Could not send error notification email: {error_mail_exception}")
 
         # Cleanup files that may have remained after an error
         mws_helpers.safe_unlink(obfuscated_decrypted_fullpath, "decrypted original file")
