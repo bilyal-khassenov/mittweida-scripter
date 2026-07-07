@@ -365,7 +365,7 @@ def create_logger(loger_name: str):
         return f"{root}{num}{ext}"
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    file_handler = RotatingFileHandler('../logs/' + loger_name + '.log', maxBytes=100_000, backupCount=2)
+    file_handler = RotatingFileHandler('../logs/' + loger_name + '.log', maxBytes=100_000, backupCount=5)
     file_handler.namer = namer
 
     console_handler = logging.StreamHandler()
