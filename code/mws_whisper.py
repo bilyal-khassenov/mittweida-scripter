@@ -33,6 +33,8 @@ dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
 configs = mws_helpers.get_configs()
 
+#create logger
+logger = mws_helpers.create_logger(__name__)
 
 def notify_admins(message):
     if configs['telegram']['use_telegram'] == True:
@@ -42,6 +44,7 @@ def notify_admins(message):
         )
 
 def diarize_file(file_path):
+    logger.debug("Diarizing file...")
     from pyannote.audio import Pipeline
 
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
@@ -65,11 +68,12 @@ def diarize_file(file_path):
         })
         index = index + 1
 
-    print("Diarization finished successfully")
+    logger.debug("Diarization finished successfully")
     return speech_turns
 
 
 def diarize_timestamped_words(conversation_turns, timestamped_words):
+    logger.debug("Diarizing timestamped words...")
     for conversation_turn in conversation_turns:
         # First prepare list of all words marked as temporary acceptable or not for this speech turn
         for word in timestamped_words:
@@ -99,6 +103,7 @@ def diarize_timestamped_words(conversation_turns, timestamped_words):
 
 
 def transcribe_file(obfuscated_standardized_fullpath):
+    logger.debug("Transcribing file...")
     obfuscated_standardized_fullpath = pathlib.Path(obfuscated_standardized_fullpath)
     obfuscated_diarization_wav_fullpath = None
 
@@ -135,7 +140,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
         subtitle_setting = int(os.path.basename(structured_filename).split('#', 8)[6])
 
         # Load the model
-        print("Loading Whisper...")
+        logger.debug("Loading Whisper...")
 
         if torch.cuda.is_available():
             whisper_model = whisper.load_model(selected_transcription_model).cuda().eval()
@@ -143,7 +148,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
             whisper_model = whisper.load_model(selected_transcription_model)
 
         # Transcribe
-        print(f"Transcription starts for {obfuscated_standardized_fullpath}...")
+        logger.debug(f"Transcription starts for {obfuscated_standardized_fullpath}")
 
         result = whisper_model.transcribe(
             str(obfuscated_standardized_fullpath),
@@ -175,7 +180,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
             )
 
         # Prepare full name and create document
-        print("Creating Word Document...")
+        logger.debug("Creating Word Document...")
 
         transcript_text_only_file_fullname = os.path.join(
             dir_processed,
@@ -282,6 +287,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
                     if ffmpeg_error.stderr
                     else ""
                 )
+                logger.error(f"FFmpeg WAV conversion for diarization failed:\n{stderr}", exc_info=True)
                 raise RuntimeError(f"FFmpeg WAV conversion for diarization failed:\n{stderr}") from ffmpeg_error
 
             conversation_turns_diarized = diarize_file(str(obfuscated_diarization_wav_fullpath))
@@ -459,6 +465,7 @@ def transcribe_file(obfuscated_standardized_fullpath):
         ]
 
     except Exception:
+        logger.critical('Transcription failed.', exc_info=True)
         # Get exception infos
         error_string = traceback.format_exc()
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
@@ -494,6 +501,7 @@ def get_decrypted_bytes(enc_file_fullpath):
 
 
 def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None):
+    logger.debug('Processing file...')
     obfuscated_decrypted_fullpath = None
     obfuscated_standardized_fullpath = None
     obfuscated_filename_stem = None
@@ -557,6 +565,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 if ffmpeg_error.stderr
                 else ""
             )
+            logger.error(f"FFmpeg Opus conversion failed:\n{stderr}", exc_info=True)
             raise RuntimeError(f"FFmpeg Opus conversion failed:\n{stderr}") from ffmpeg_error
 
         # Delete decrypted original only after successful conversion
@@ -570,6 +579,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         transcription_result_paths = transcribe_file(obfuscated_standardized_fullpath)
 
         if not transcription_result_paths:
+            logger.error("transcribe_file did not return result paths", exc_info=True)
             raise RuntimeError("transcribe_file did not return result paths")
 
         transcript_text_only_file_fullname = transcription_result_paths[0]
@@ -586,6 +596,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         if not duration_seconds:
             duration_minutes = 0
             message_text_for_later = "Could not read duration for file"
+            logger.warning(message_text_for_later)
         else:
             duration_minutes = round(duration_seconds / 60, 2)
             message_text_for_later = f"{duration_minutes} min. long"
@@ -652,6 +663,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
             )
 
         except Exception as e:
+            logger.error('Could not send email', exc_info=True)
             notify_admins(
                 f"({getpass.getuser()}) - Transcription was successful, "
                 f"but an error occurred when trying to send the email"
@@ -691,11 +703,11 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                         )
                     )
                 except FileNotFoundError:
-                    print("Source file not found!")
+                    logger.error('Source file not found!', exc_info=True)
                 except PermissionError:
-                    print("Permission denied!")
+                    logger.error('Permission denied!', exc_info=True)
                 except Exception as copy_error:
-                    print(f"An error occurred while copying {results_file}: {copy_error}")
+                    logger.error(f'An error occurred while copying {results_file}: {copy_error}', exc_info=True)
 
         # Delete Word and subtitle files after sending/copying them
         mws_helpers.safe_unlink(transcript_text_only_file_fullname, "text-only transcript DOCX file")
@@ -725,6 +737,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         )
 
     except Exception:
+        logger.critical('Could not process file!', exc_info=True)
         error_string = traceback.format_exc()
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
         notify_admins(error_message_for_admins)
@@ -746,7 +759,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
             )
 
         except Exception as error_mail_exception:
-            print(f"Could not send error notification email: {error_mail_exception}")
+            logger.error(f"Could not send error notification email: {error_mail_exception}", exc_info=True)
 
         # Cleanup files that may have remained after an error
         mws_helpers.safe_unlink(obfuscated_decrypted_fullpath, "decrypted original file")
@@ -810,16 +823,17 @@ def main():
                 except Exception:
                     # If the process could not start, remove the marker again.
                     mws_helpers.safe_unlink(processing_marker_fullpath)
+                    logger.error('Could not start daemon process', exc_info=True)
                     raise
 
-                print(
+                logger.debug(
                     f"Something has been loaded and we created a new daemon process for it! "
                     f"Active jobs: {count_files_in_proggress + 1}. "
                     f"Let's sleep again for {seconds} seconds till the next check..."
                 )
 
             else:
-                print(
+                logger.debug(
                     f"Well... Nothing was loaded in the meanwhile! "
                     f"Active jobs: {count_files_in_proggress}. "
                     f"Let's sleep again for {seconds} seconds till the next check..."

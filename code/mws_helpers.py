@@ -1,5 +1,6 @@
-import pathlib, os, json, time, uuid
+import pathlib, os, json, time, uuid, logging
 from typing import Literal
+from logging.handlers import RotatingFileHandler
 
 class ProjectPaths:
     def __init__(self):
@@ -349,3 +350,27 @@ def get_media_info(path):
         'duration_seconds': duration,
         'size_bytes': size_bytes
     }
+
+def create_logger(loger_name: str):
+    pathlib.Path("../logs/").mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(loger_name)
+    logger.setLevel(logging.WARNING)
+
+    if logger.handlers:
+        return logger
+
+    def namer(default_name):
+        base, _, num = default_name.rpartition(".")
+        root, ext = os.path.splitext(base)
+        return f"{root}{num}{ext}"
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    file_handler = RotatingFileHandler('../logs/' + loger_name + '.log', maxBytes=100_000, backupCount=2)
+    file_handler.namer = namer
+
+    console_handler = logging.StreamHandler()
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    return logger
