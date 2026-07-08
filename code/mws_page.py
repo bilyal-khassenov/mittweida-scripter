@@ -202,47 +202,32 @@ def main():
     if "form_elements_disabled" not in st.session_state:
         st.session_state.disabled = False
 
-    # Main form
-    with st.form(key="Form :", clear_on_submit=False):
-
-        # E-Mail-Address
-        email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'],
-                                              disabled=any([st.session_state.disabled, data_protection_agreed != True]))
-        # Create two columns for Language & Translation Settings
-        language_column, translation_column, diarization_column, model_column, subtitle_column = st.columns(
-            [1, 1, 1, 1, 1])  # Adjust width ratios if needed
+    #Main form
+    with st.form(key="Form :", clear_on_submit = False):
+        
+        #E-Mail-Address
+        email_address_textbox = st.text_input(texts_from_config_file['email_field_lable'], disabled=any([st.session_state.disabled, data_protection_agreed!=True]))
+        #Create two columns for Language & Translation Settings
+        language_column, model_column, diarization_column, subtitle_column, translation_column   = st.columns([1, 1, 1, 1, 1])  # Adjust width ratios if needed
         # Create two columns for subtitles & summary generation
         summary_column, summary_language, _, _, _ = st.columns([1, 1, 1, 1, 1])
-        # Language Selection Area
-        capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted(
-            [lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
-        summary_languages = [texts_from_config_file['summary_language_code_selectbox_default_option']] + sorted(
-            [lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
+        #Placeholder for Summarization Area
+        #Language Selection Area
+        capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
-            language_name = st.selectbox(texts_from_config_file['language_code_selectbox_label'], capitalized_languages,
-                                         disabled=any([st.session_state.disabled, data_protection_agreed != True]))
-        # Translation Selection Area
-        with translation_column:
-            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'],
-                                               [texts_from_config_file['no'], texts_from_config_file['yes']],
-                                               disabled=any(
-                                                   [st.session_state.disabled, data_protection_agreed != True]))
-        # Diarization Setting Area
-        with diarization_column:
-            diarization_setting = st.selectbox(texts_from_config_file['speaker_assignment_label'],
-                                               [texts_from_config_file['no'], texts_from_config_file['yes']],
-                                               disabled=any(
-                                                   [st.session_state.disabled, data_protection_agreed != True]))
-        # Model Selection Area
+            language_name = st.selectbox(texts_from_config_file['language_code_selectbox_label'], capitalized_languages)
+        #Model Selection Area
         with model_column:
-            transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'],
-                                               help=texts_from_config_file['highest_speed_tip'], disabled=any(
-                    [st.session_state.disabled, data_protection_agreed != True]))
-        # Subtitle Setting Area
+            transcription_model = st.selectbox(texts_from_config_file['model_selection_label'], ['large-v2', 'turbo'], help=texts_from_config_file['highest_speed_tip'])
+        #Diarization Setting Area
+        with diarization_column:
+            diarization_setting = st.selectbox(texts_from_config_file['speaker_assignment_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
+        #Subtitle Setting Area
         with subtitle_column:
-            subtitle_setting = st.selectbox(texts_from_config_file['subtitle_selectbox_label'],
-                                            options=[texts_from_config_file['no'], texts_from_config_file['yes']],
-                                            disabled=any([st.session_state.disabled, data_protection_agreed != True]))
+            subtitle_setting = st.selectbox(texts_from_config_file['subtitle_selectbox_label'], options=[texts_from_config_file['no'], texts_from_config_file['yes']])
+        #Translation Selection Area
+        with translation_column:
+            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
         # Summary Setting Area
         with summary_column:
             summary_setting = st.selectbox(
@@ -378,25 +363,61 @@ def main():
                                          'diarization_status': diarization_setting,
                                          'transcription_model': transcription_model}]
 
-                    # Register new record - transform it to a dataframe
-                    new_record_df = pd.DataFrame(new_order_record)
-                    # Check if protocol exists. If not, create it
-                    mws_helpers.make_sure_protocols_exist()
-                    # Read protocol
-                    protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
-                    # Concatanate protocol records
-                    result = pd.concat([protocol, new_record_df])
-                    # Save new state of the protocol
-                    result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
+                #Prepare New Protocol Record
+                try:
+                    institution_referer = st.context.headers[configs['header_names']['identity_provider']]
+                except:
+                    institution_referer = '--'
+                #Prepare new protocol record
+                new_order_record = [{'upload_timestamp': time.time(),
+                                        'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
+                                        'duration_seconds': duration_seconds,
+                                        'file_size': file_size,
+                                        'institution': institution_referer,
+                                        'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
+                                        'translation_status': translation_setting,
+                                        'diarization_status': diarization_setting,
+                                        'subtitles_status': subtitle_setting,
+                                        'transcription_model': transcription_model}]
 
-                    # Send notification to Admin to let him know a new file has been uploaded for Transcription
-                    if configs['telegram']['use_telegram'] == True:
-                        count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
-                        count_in_progress, _ = mws_helpers.count_and_list_files(dir_in_progress)
-                        mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
-                                                          f"NEW FILE HAS BEEN UPLOADED\nMachine: {getpass.getuser()}\nInstitution: {institution_referer}\nDuration in Minutes: {round(duration_seconds / 60, 2)}\nFiles Waiting: {count_unprocessed}\nFiles in Progress: {count_in_progress}")
+                #Register new record - transform it to a dataframe
+                new_record_df = pd.DataFrame(new_order_record)
+                #Check if protocol exists. If not, create it
+                mws_helpers.make_sure_protocols_exist()
+                #Read protocol
+                protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
+                #Concatanate protocol records
+                result = pd.concat([protocol, new_record_df])
+                #Save new state of the protocol
+                result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
+                
+                #Send notification to Admin to let him know a new file has been uploaded for Transcription
+                if configs['telegram']['use_telegram'] == True:
+                    count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
+                    count_in_progress, _ = mws_helpers.count_processing_jobs()
 
-                # Success message for user
+                    duration_minutes_for_message = (
+                        round(duration_seconds / 60, 2)
+                        if duration_seconds is not None
+                        else "unknown"
+                    )
+
+                    mws_helpers.send_telegram_message(
+                        configs['telegram']['admin_chat_id'],
+                        f"NEW FILE HAS BEEN UPLOADED\n"
+                        f"Machine: {getpass.getuser()}\n"
+                        f"Institution: {institution_referer}\n"
+                        f"Duration in Minutes: {duration_minutes_for_message}\n"
+                        f"Language Code: {mws_helpers.get_language_setting_index_or_code(language_setting)}\n"
+                        f"Transcription Model: {transcription_model}\n"
+                        f"Diarization Status: {diarization_setting}\n"
+                        f"Translation Status: {translation_setting}\n"
+                        f"Subtitles Status: {subtitle_setting}\n"
+                        f"Files Waiting: {count_unprocessed}\n"
+                        f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
+                    )
+                    
+                #Success message for user
                 st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
         else:
             print(st.error(texts_from_config_file['error_wrong_email'], icon="🚨"))

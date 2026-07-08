@@ -69,7 +69,11 @@
             "yes": "Ja",
             "no": "Nein",
             "model_selection_label": "Transkriptionsmodell",
-            "highest_speed_tip": "Tipp: Für die schnellste Transkription wählen Sie das Turbo-Modell ohne Sprecher:innenzuordnung. So wird eine einstündige Datei in etwa nur 1 Minute transkribiert! (allerdings mit einem minimalen Qualitätsverlust)"
+            "highest_speed_tip": "Tipp: Für die schnellste Transkription wählen Sie das Turbo-Modell ohne Sprecher:innenzuordnung. So wird eine einstündige Datei in etwa nur 1 Minute transkribiert! (allerdings mit einem minimalen Qualitätsverlust)",
+            "subtitle_selectbox_label": "Untertitel generieren?",
+            "summary_selectbox_label": "Zusammenfassung generieren?",
+            "summary_language_selectbox_label": "Sprache der Zusammenfassung",
+            "summary_language_code_selectbox_default_option": "English"
         },
         "whisper":{
             "docx_text_only_title": "Transkription - Nur Text",
@@ -77,9 +81,13 @@
             "docx_text_conversation_turns_title": "Transkription - Mit Sprecher:innen-Zuordnung",
             "email_text_one_file": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie eine Dateie mit dem transkribierten Text.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_text_two_files": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie zwei Dateien: eine mit ausschließlich dem transkribierten Text und eine weitere, die den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln enthält.\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
+            "email_text_error": "Sehr geehrte Damen und Herren, \n\nleider ist bei der Transkription der von Ihnen hochgeladenen Datei ein Fehler aufgetreten.\n\nSie können uns auch die Datei direkt zukommen lassen und wir schauen uns das Problem genauer an.\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_subject": "Transkription",
+            "email_subject_error": "Transkription fehlgeschlagen",
             "text_only_attachment_postfix": "_text_only",
-            "conversation_turns_attachment_postfix": "_conversation_turns"
+            "conversation_turns_attachment_postfix": "_conversation_turns",
+            "summary_attachment_postfix": "_summary",
+            "subtitle_attachment_postfix": "_subtitles"
         }
     }
   }

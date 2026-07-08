@@ -1,5 +1,6 @@
-import pathlib, os, json
+import pathlib, os, json, time, uuid, logging
 from typing import Literal
+from logging.handlers import RotatingFileHandler
 
 
 class ProjectPaths:
@@ -160,7 +161,6 @@ def send_mail(send_from, send_to, subject, message, files=[],
 
 
 def send_telegram_message(admin_recipients, message_string: str):
-    from urllib.parse import quote_plus
     import requests
 
     # Read configs
@@ -168,14 +168,25 @@ def send_telegram_message(admin_recipients, message_string: str):
 
     # Check how recipients were provided and transform them to list if needed
     if not isinstance(admin_recipients, list):
-        admin_recipients = [recipient.strip() for recipient in admin_recipients.split(',')]
+        admin_recipients = [
+            recipient.strip()
+            for recipient in admin_recipients.split(',')
+        ]
 
-    # Send message to each recipient
+    url = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage"
+
     for admin_recipient in admin_recipients:
-        send_text = f"https://api.telegram.org/bot{configs['telegram']['bot_token']}/sendMessage?chat_id={admin_recipient}&parse_mode=Markdown&text={quote_plus(message_string)}&disable_web_page_preview=True"
-        response = requests.get(send_text)
+        payload = {
+            "chat_id": admin_recipient,
+            "text": message_string,
+            "disable_web_page_preview": True
+        }
 
+        response = requests.get(url, params=payload)
 
+        if not response.ok:
+            print(f"Telegram message failed: {response.status_code} - {response.text}")
+    
 def get_css_opacity_style_code(style: Literal['grey', 'normal']):
     if style == 'grey':
         grey_style = """<style>
@@ -247,10 +258,91 @@ def clarify_string(token: str) -> str:
     decryptor = cipher.decryptor()
     return (decryptor.update(ct) + decryptor.finalize()).decode()
 
+def safe_unlink(file_path, label="file"):
+    """
+    Safely delete a file if it exists.
+    Accepts either str or pathlib.Path.
+    """
+    if file_path is None:
+        return
+
+    try:
+        path = pathlib.Path(file_path)
+
+        if path.exists():
+            path.unlink()
+            print(f"{label} deleted successfully: {path}")
+
+    except FileNotFoundError:
+        print(f"{label} does not exist: {file_path}")
+
+    except PermissionError:
+        print(f"No permission to delete {label}: {file_path}")
+
+    except Exception as e:
+        print(f"Could not delete {label} {file_path}: {e}")
+
+
+def create_processing_marker(source_file_path):
+    """
+    Creates a marker file representing one active processing job.
+    The marker is used for counting active daemon processes.
+    """
+    marker_dir = pathlib.Path(ProjectPaths().in_progress_folder_path)
+    marker_dir.mkdir(parents=True, exist_ok=True)
+
+    source_stem = pathlib.Path(source_file_path).stem
+    marker_name = f"{source_stem}.{uuid.uuid4().hex}.job"
+    marker_path = marker_dir / marker_name
+
+    marker_data = {
+        "source_file": str(source_file_path),
+        "source_stem": source_stem,
+        "created_at": time.time(),
+        "pid": os.getpid()
+    }
+
+    with open(marker_path, "x", encoding="utf-8") as marker_file:
+        json.dump(marker_data, marker_file)
+
+    return str(marker_path)
+
+
+def count_processing_jobs():
+    """
+    Count active processing jobs by counting .job marker files only.
+    This intentionally ignores .opus, .wav, .docx, .srt, .vtt, etc.
+    """
+    marker_dir = pathlib.Path(ProjectPaths().in_progress_folder_path)
+
+    if not marker_dir.exists():
+        return 0, []
+
+    marker_files = []
+
+    for path in marker_dir.iterdir():
+        if path.is_file() and path.suffix.lower() == ".job":
+            marker_files.append(str(path))
+
+    return len(marker_files), marker_files
+
+
+def cleanup_processing_markers():
+    """
+    Removes all old processing markers.
+
+    Use this once when starting/restarting the daemon script.
+    Do NOT call this from the Streamlit page and do NOT call this repeatedly
+    while workers may still be running.
+    """
+    _, marker_files = count_processing_jobs()
+
+    for marker_file in marker_files:
+        safe_unlink(marker_file)
+
 
 def count_and_list_files(folder_path):
     files = []
-    # Initialize counter variables
     files_count = 0
     excluded_extensions = {'.json', '.gitignore'}
     # Count files in progress
@@ -261,6 +353,7 @@ def count_and_list_files(folder_path):
                 path).suffix.lower() not in excluded_extensions:
             files_count += 1
             files.append(file_path)
+
     return files_count, files
 
 
@@ -303,3 +396,27 @@ def get_media_info(path):
         'duration_seconds': duration,
         'size_bytes': size_bytes
     }
+
+def create_logger(loger_name: str):
+    pathlib.Path("../logs/").mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(loger_name)
+    logger.setLevel(logging.WARNING)
+
+    if logger.handlers:
+        return logger
+
+    def namer(default_name):
+        base, _, num = default_name.rpartition(".")
+        root, ext = os.path.splitext(base)
+        return f"{root}{num}{ext}"
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    file_handler = RotatingFileHandler('../logs/' + loger_name + '.log', maxBytes=100_000, backupCount=5)
+    file_handler.namer = namer
+
+    console_handler = logging.StreamHandler()
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    return logger

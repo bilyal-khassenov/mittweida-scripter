@@ -1,6 +1,7 @@
 # Import main packages
 import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback, json, tiktoken
-from mutagen.mp3 import MP3
+import ffmpeg
+from mutagen.oggopus import OggOpus
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
 from docx.shared import Pt
@@ -9,9 +10,11 @@ from ollama import chat
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 ######from docx.document import Document #Keep it for Intellisense!
+###### from docx.document import Document # Keep it for Intellisense!
 
 # Import helper functions
 import mws_helpers
+
 
 # Central paths definition
 new_line_for_f_strings = '\n'
@@ -19,46 +22,77 @@ dir_temp_orig_files = mws_helpers.ProjectPaths().temp_orig_file_path
 dir_format_conversion = mws_helpers.ProjectPaths().folder_for_format_conversion_path
 dir_in_progress = mws_helpers.ProjectPaths().in_progress_folder_path
 dir_processed = mws_helpers.ProjectPaths().processed_folder_path
+dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
 configs = mws_helpers.get_configs()
 enc = tiktoken.get_encoding("cl100k_base")
 
+#create logger
+logger = mws_helpers.create_logger(__name__)
+
+def notify_admins(message):
+    if configs['telegram']['use_telegram'] == True:
+        mws_helpers.send_telegram_message(
+            configs['telegram']['admin_chat_id'],
+            message
+        )
 
 def diarize_file(file_path):
+    logger.debug("Diarizing file...")
     from pyannote.audio import Pipeline
+
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
+
     # Check if CUDA is available and if it is, send pipeline to GPU
     if torch.cuda.is_available():
         pipeline.to(torch.device("cuda"))
+
     # Apply pretrained pipeline
-    diarization = pipeline(file_path)
-    # Print the result
+    diarization = pipeline(str(file_path))
+
     speech_turns = []
     index = 0
+
     for turn, _, speaker in diarization.itertracks(yield_label=True):
-        speech_turns.append({'index': index, 'start': turn.start, 'end': turn.end, 'speaker': speaker})
+        speech_turns.append({
+            'index': index,
+            'start': turn.start,
+            'end': turn.end,
+            'speaker': speaker
+        })
         index = index + 1
-        # print(f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}")
+
+    logger.debug("Diarization finished successfully")
     return speech_turns
 
 
 def diarize_timestamped_words(conversation_turns, timestamped_words):
+    logger.debug("Diarizing timestamped words...")
     for conversation_turn in conversation_turns:
         # First prepare list of all words marked as temporary acceptable or not for this speech turn
         for word in timestamped_words:
-            word['start_acceptable'] = float(word['end']) > float(
-                conversation_turn['start'])  # Word must end after the start of conversation turn
-            word['end_acceptable'] = float(word['start']) < float(
-                conversation_turn['end'])  # Word must start before th end of conversation turn
-            word['acceptance_result'] = word['start_acceptable'] == True and word[
-                'end_acceptable'] == True  # Both previous conditions must be met
+            # Word must end after the start of conversation turn
+            word['start_acceptable'] = float(word['end']) > float(conversation_turn['start'])
+
+            # Word must start before the end of conversation turn
+            word['end_acceptable'] = float(word['start']) < float(conversation_turn['end'])
+
+            # Both previous conditions must be met
+            word['acceptance_result'] = (
+                word['start_acceptable'] == True
+                and word['end_acceptable'] == True
+            )
+
         # Collect conversation turn from individual words that were accepted for it
         conversation_turn_text = ''
+
         for word in timestamped_words:
             if word['acceptance_result'] == True:
                 conversation_turn_text = conversation_turn_text + word['word']
+
         # Save the collected conversation turn text to the processed conversation turn
         conversation_turn['text'] = conversation_turn_text.strip()
+
     return conversation_turns
 
 
@@ -144,14 +178,18 @@ def summarize_file(input_data, original_file_path, prompt_hint, summary_language
     return summary_path
 
 
-def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
-    try:
 
+def transcribe_file(obfuscated_standardized_fullpath):
+    logger.debug("Transcribing file...")
+    obfuscated_standardized_fullpath = pathlib.Path(obfuscated_standardized_fullpath)
+    obfuscated_diarization_wav_fullpath = None
+
+    try:
         # Remember start time of the transcription process
         transcription_start_time = time.time()
 
         # Clarify obfuscated filename stem
-        obfuscated_stem = pathlib.Path(obfuscated_standardized_fullpath).stem
+        obfuscated_stem = obfuscated_standardized_fullpath.stem
         structured_filename = mws_helpers.clarify_string(obfuscated_stem)
 
         # Extract Language Code
@@ -165,7 +203,8 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(
             int(structured_filename.split('#', 9)[8]))
 
-        file_duration = MP3(obfuscated_standardized_fullpath).info.length
+        # Read Opus duration and size
+        file_duration = OggOpus(str(obfuscated_standardized_fullpath)).info.length
         file_size = os.path.getsize(obfuscated_standardized_fullpath)
 
         # Extract subtitle Setting from Base Name
@@ -173,17 +212,22 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
 
         summary_setting = int(os.path.basename(structured_filename).split('#', 9)[7])
         # Load the model
-        print("Loading Whisper...")
+        logger.debug("Loading Whisper...")
         if torch.cuda.is_available():
-            whisper_model = whisper.load_model(
-                selected_transcription_model).cuda().eval()  # CUDA available and will be used for transcribing
+            whisper_model = whisper.load_model(selected_transcription_model).cuda().eval()
         else:
-            whisper_model = whisper.load_model(selected_transcription_model)  # CUDA not available
+            whisper_model = whisper.load_model(selected_transcription_model)
 
         # Transcribe
-        print(f"Transcription starts for {obfuscated_standardized_fullpath}...")
-        result = whisper_model.transcribe(str(obfuscated_standardized_fullpath), verbose=True, word_timestamps=True,
-                                          language=language_code, task=translation_status)
+        logger.debug(f"Transcription starts for {obfuscated_standardized_fullpath}")
+
+        result = whisper_model.transcribe(
+            str(obfuscated_standardized_fullpath),
+            verbose=True,
+            word_timestamps=True,
+            language=language_code,
+            task=translation_status
+        )
 
         # Create subtitles if requested
         subtitle_srt_file = None
@@ -196,14 +240,26 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
             vtt_writer = get_writer("vtt", dir_processed)
             vtt_writer(result, structured_filename)
 
-            subtitle_srt_file = os.path.join(dir_processed, pathlib.Path(structured_filename).stem + ".srt")
-            subtitle_vtt_file = os.path.join(dir_processed, pathlib.Path(structured_filename).stem + ".vtt")
+            subtitle_srt_file = os.path.join(
+                dir_processed,
+                pathlib.Path(structured_filename).stem + ".srt"
+            )
+
+            subtitle_vtt_file = os.path.join(
+                dir_processed,
+                pathlib.Path(structured_filename).stem + ".vtt"
+            )
 
         # Prepare full name and create document
-        # new_file_name_stem = pathlib.Path(standardized_mp3_bytes).stem
-        print("Creating Word Document...")
-        transcript_text_only_file_fullname = os.path.join(dir_processed, obfuscated_stem + configs['texts']['whisper'][
-            'text_only_attachment_postfix'] + '.docx')
+        logger.debug("Creating Word Document...")
+
+        transcript_text_only_file_fullname = os.path.join(
+            dir_processed,
+            obfuscated_stem
+            + configs['texts']['whisper']['text_only_attachment_postfix']
+            + '.docx'
+        )
+
         # Create summary if requested
         summary_file = None
         if summary_setting == 1:
@@ -218,10 +274,8 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
             summary_file = summarize_file(result["text"], transcript_text_only_file_fullname, prompt_hint,
                                           summary_language)
 
-        # Prepare full name and create document
-        new_file_name_stem = pathlib.Path(structured_filename).stem
-        transcript_text_only_file_fullname = os.path.join(dir_processed, new_file_name_stem + '_text.docx')
         document_text_only = Document()
+
         # Change Docx Settings
         style = document_text_only.styles['Normal']
         font = style.font
@@ -234,18 +288,28 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
 
         # Add colors legend
         document_text_only.add_heading(configs['texts']['whisper']['docx_color_legends_label'])
+
         confidence_high_run = document_text_only.add_paragraph().add_run(
-            f"Hohes Konfidenzniveau (> {high_confidence_level_lower_bound}): Text wird nicht farblich hervorgehoben.")
+            f"Hohes Konfidenzniveau (> {high_confidence_level_lower_bound}): "
+            f"Text wird nicht farblich hervorgehoben."
+        )
+
         confidence_average_run = document_text_only.add_paragraph().add_run(
-            f"Mittleres Konfidenzniveau ({average_confidence_level_lower_bound} Ã¢â€°Â¤ Wert Ã¢â€°Â¤ {high_confidence_level_lower_bound}): Text wird gelb hervorgehoben.")
+            f"Mittleres Konfidenzniveau "
+            f"({average_confidence_level_lower_bound} ≤ Wert ≤ {high_confidence_level_lower_bound}): "
+            f"Text wird gelb hervorgehoben."
+        )
         confidence_average_run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+
         confidence_low_run = document_text_only.add_paragraph().add_run(
-            f"Niedriges Konfidenzniveau (< {average_confidence_level_lower_bound}): Text wird rot hervorgehoben.")
+            f"Niedriges Konfidenzniveau (< {average_confidence_level_lower_bound}): "
+            f"Text wird rot hervorgehoben."
+        )
         confidence_low_run.font.highlight_color = WD_COLOR_INDEX.RED
 
         # Add heading
         document_text_only.add_heading(configs['texts']['whisper']['docx_text_only_title'])
-        # Add colors explanation
+
         # Add new paragraph
         text_paragraph = document_text_only.add_paragraph()
 
@@ -264,10 +328,11 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
                 if "words" in segment:
                     segment_confidency = segment['avg_logprob']
                     print(segment_confidency)
+
                     highlight_color = select_highlight_color(segment_confidency)
                     run_text = segment['text']
+
                     current_run = text_paragraph.add_run(run_text)
-                    # Set the highlight color
                     current_run.font.highlight_color = highlight_color
 
         # Save file
@@ -275,25 +340,74 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
 
         # Perform diarization conditionally
         if diarization_setting == 1:
-            conversation_turns_diarized = diarize_file(obfuscated_standardized_fullpath)
+            # Pyannote/torchaudio can be more reliable with WAV than Opus.
+            # So we create a temporary WAV only for diarization.
+            obfuscated_diarization_wav_fullpath = pathlib.Path(
+                dir_in_progress,
+                obfuscated_stem + "_diarization.wav"
+            )
+
+            diarization_stream = ffmpeg.input(str(obfuscated_standardized_fullpath)).audio
+
+            diarization_stream = ffmpeg.output(
+                diarization_stream,
+                str(obfuscated_diarization_wav_fullpath),
+                **{
+                    "ac": 1,
+                    "ar": 16000,
+                    "c:a": "pcm_s16le",
+                }
+            )
+
+            try:
+                ffmpeg.run(
+                    diarization_stream,
+                    overwrite_output=True,
+                    capture_stdout=True,
+                    capture_stderr=True
+                )
+            except ffmpeg.Error as ffmpeg_error:
+                stderr = (
+                    ffmpeg_error.stderr.decode("utf-8", errors="replace")
+                    if ffmpeg_error.stderr
+                    else ""
+                )
+                logger.error(f"FFmpeg WAV conversion for diarization failed:\n{stderr}", exc_info=True)
+                raise RuntimeError(f"FFmpeg WAV conversion for diarization failed:\n{stderr}") from ffmpeg_error
+
+            conversation_turns_diarized = diarize_file(str(obfuscated_diarization_wav_fullpath))
+
+            # Delete temporary WAV after successful diarization
+            mws_helpers.safe_unlink(obfuscated_diarization_wav_fullpath, "temporary diarization WAV file")
+            obfuscated_diarization_wav_fullpath = None
+
             # Normalize diarized turns
             normalized_and_diarized_turns = []
-            counterchecked_turns = []
             processed_turns_indexes = []
+
             start_clipboarded = None
             end_clipboarded = None
             speaker_clipboarded = None
-            for main_turn_checked in conversation_turns_diarized:  # Main normalization loop
-                if not main_turn_checked[
-                           'index'] in processed_turns_indexes:  # Check if this turn has already been normalized
-                    start_clipboarded = main_turn_checked['start']  # In not, remember its starting time
-                    end_clipboarded = main_turn_checked['end']  # Remember its ending time
-                    speaker_clipboarded = main_turn_checked['speaker']  # Remember its speaker
+
+            for main_turn_checked in conversation_turns_diarized:
+                # Check if this turn has already been normalized
+                if not main_turn_checked['index'] in processed_turns_indexes:
+                    # If not, remember its starting time
+                    start_clipboarded = main_turn_checked['start']
+
+                    # Remember its ending time
+                    end_clipboarded = main_turn_checked['end']
+
+                    # Remember its speaker
+                    speaker_clipboarded = main_turn_checked['speaker']
+
                     # Extract only unprocessed turns for counter-check
                     counterchecked_turns = []
+
                     for counterchecked_turn in conversation_turns_diarized:
                         if counterchecked_turn['index'] > main_turn_checked['index']:
                             counterchecked_turns.append(counterchecked_turn)
+
                     # Perform counter-check
                     for counterchecked_turn in counterchecked_turns:
                         if counterchecked_turn['speaker'] == main_turn_checked['speaker']:
@@ -302,59 +416,97 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
                         else:
                             processed_turns_indexes.append(main_turn_checked['index'])
                             break
+
                     # Protocol normalized turn
-                    normalized_and_diarized_turns.append(
-                        {'start': start_clipboarded, 'end': end_clipboarded, 'speaker': speaker_clipboarded})
+                    normalized_and_diarized_turns.append({
+                        'start': start_clipboarded,
+                        'end': end_clipboarded,
+                        'speaker': speaker_clipboarded
+                    })
 
             # Prepare word-level timestamps
             timestamped_words = []
+
             for segment in result['segments']:
                 for word in segment['words']:
-                    timestamped_words.append({'word': word['word'], 'start': word['start'], 'end': word['end']})
+                    timestamped_words.append({
+                        'word': word['word'],
+                        'start': word['start'],
+                        'end': word['end']
+                    })
 
             # Assign words to conversation turns
-            completed_conversation_turns = diarize_timestamped_words(normalized_and_diarized_turns, timestamped_words)
+            completed_conversation_turns = diarize_timestamped_words(
+                normalized_and_diarized_turns,
+                timestamped_words
+            )
 
             # Save conversation turns to a Docx File
             def convert_secs_to_timestamp(seconds):
                 seconds_in_hours = seconds / 3600
                 timestamp = str(datetime.timedelta(hours=seconds_in_hours))[:10]
+
                 if len(timestamp) == 7:
                     timestamp = timestamp + '.00'
+
                 return timestamp
 
-            transcript_conversation_turns_file_fullname = os.path.join(dir_processed,
-                                                                       obfuscated_stem + configs['texts']['whisper'][
-                                                                           'conversation_turns_attachment_postfix'] + '.docx')
+            transcript_conversation_turns_file_fullname = os.path.join(
+                dir_processed,
+                obfuscated_stem
+                + configs['texts']['whisper']['conversation_turns_attachment_postfix']
+                + '.docx'
+            )
+
             # Create Docx file
             document_conversation_turns = Document()
+
             # Change Docx Settings
             style = document_conversation_turns.styles['Normal']
             font = style.font
             font.name = configs['ui_settings']['corporate_design_font']
             font.size = Pt(10)
+
             # Add heading
-            document_conversation_turns.add_heading(configs['texts']['whisper']['docx_text_conversation_turns_title'])
+            document_conversation_turns.add_heading(
+                configs['texts']['whisper']['docx_text_conversation_turns_title']
+            )
+
             # Add all conversation turns
             for conversation_turn in completed_conversation_turns:
-                p = document_conversation_turns.add_paragraph('')  # Add empty speaker line
+                # Add empty speaker line
+                p = document_conversation_turns.add_paragraph('')
+
+                # Add bold speaker/timestamp line
                 p.add_run(
-                    f"{conversation_turn['speaker']} -> {convert_secs_to_timestamp(conversation_turn['start'])}-{convert_secs_to_timestamp(conversation_turn['end'])}").bold = True  # Now add bold text in this speaker line
+                    f"{conversation_turn['speaker']} -> "
+                    f"{convert_secs_to_timestamp(conversation_turn['start'])}-"
+                    f"{convert_secs_to_timestamp(conversation_turn['end'])}"
+                ).bold = True
+
+                # Add conversation text
                 document_conversation_turns.add_paragraph(
-                    f"{conversation_turn['text']}")  # And now add the text of this concersation turn
-                document_conversation_turns.add_paragraph('')  # And here a new line
+                    f"{conversation_turn['text']}"
+                )
+
+                # Add empty line
+                document_conversation_turns.add_paragraph('')
+
             document_conversation_turns.save(transcript_conversation_turns_file_fullname)
+
         else:
             transcript_conversation_turns_file_fullname = None
 
-        # Delete the original file
-        pathlib.Path.unlink(obfuscated_standardized_fullpath)
+        # Delete the standardized Opus file after transcription is complete
+        mws_helpers.safe_unlink(obfuscated_standardized_fullpath, "standardized Opus file")
 
         # Get ending time of the transcription
         transcription_end_time = time.time()
+
         # Prepare new line for the performance stats
         language_code_for_protocol = '--' if language_code is None else language_code
         translation_status_for_protocol = 'translate' if translation_status == "translate" else 'original'
+
         new_perf_record = [{
             'model': selected_transcription_model,
             'language_code': language_code_for_protocol,
@@ -364,89 +516,156 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
             'file_size': file_size,
             'transcription_start_time': transcription_start_time,
             'transcription_end_time': transcription_end_time,
-            'transcription_time_per_one_raw_second': (transcription_end_time - transcription_start_time) / file_duration
+            'transcription_time_per_one_raw_second': (
+                transcription_end_time - transcription_start_time
+            ) / file_duration
         }]
+
         # Create a dataframe of this dictionary
         new_perf_record_df = pandas.DataFrame(new_perf_record)
-        # Transform this line to a dataframe
-        perf_protocol = pandas.read_csv(path_to_perf_protocol, encoding='Windows-1252')
-        # Concatanate both frames
-        result = pandas.concat([perf_protocol, new_perf_record_df])
-        # Save new state of the protocol
-        result.to_csv(path_to_perf_protocol, encoding='Windows-1252', index=False)
-        return [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname, file_duration,
-                file_size, subtitle_vtt_file, subtitle_srt_file, summary_file]
 
-    except Exception as e:
+        # Load previous performance protocol
+        perf_protocol = pandas.read_csv(path_to_perf_protocol, encoding='Windows-1252')
+
+        # Concatenate both frames
+        perf_protocol_updated = pandas.concat(
+            [perf_protocol, new_perf_record_df],
+            ignore_index=True
+        )
+
+        # Save new state of the protocol
+        perf_protocol_updated.to_csv(
+            path_to_perf_protocol,
+            encoding='Windows-1252',
+            index=False
+        )
+
+        return [
+            transcript_text_only_file_fullname,
+            transcript_conversation_turns_file_fullname,
+            file_duration,
+            file_size,
+            subtitle_vtt_file,
+            subtitle_srt_file
+        ]
+
+    except Exception:
+        logger.critical('Transcription failed.', exc_info=True)
         # Get exception infos
         error_string = traceback.format_exc()
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
-        if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
-        print(error_message_for_admins)
+        notify_admins(error_message_for_admins)
 
-        # Delete the encrypted file - to-do for later: sending error message to mail address of user whose files resulted in error?
-        try:
-            pathlib.Path.unlink(obfuscated_standardized_fullpath)
-            print("File deleted successfully.")
-        except FileNotFoundError:
-            print("Error: The file does not exist.")
-        except PermissionError:
-            print("Error: You do not have permission to delete this file.")
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
-        # Delete the decrypted file
+        # Cleanup temporary files
+        mws_helpers.safe_unlink(obfuscated_diarization_wav_fullpath, "temporary diarization WAV file")
+        mws_helpers.safe_unlink(obfuscated_standardized_fullpath, "standardized Opus file")
 
-        if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
-                                              f"({getpass.getuser()}) File that resulted in error has been deleted")
+        notify_admins(
+            f"({getpass.getuser()}) File that resulted in error has been deleted"
+        )
+
+        # Re-raise so process_file also knows that transcription failed
+        raise
 
 
 def get_decrypted_bytes(enc_file_fullpath):
     from cryptography.fernet import Fernet
+
     # Get key
     key = mws_helpers.get_encryption_key()
     fernet = Fernet(key)
+
     # Read the encrypted bytes from the file
     with open(enc_file_fullpath, "rb") as enc_file:
         encrypted_bytes = enc_file.read()
+
     # Decrypt the bytes
     decrypted_bytes = fernet.decrypt(encrypted_bytes)
+
     return decrypted_bytes
 
-
-def process_file(obfuscated_encrypted_fullpath):
+def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None):
     file_path = Path(obfuscated_encrypted_fullpath)
     sidecar_path = file_path.with_suffix('.json')
+    logger.debug('Processing file...')
+    obfuscated_decrypted_fullpath = None
+    obfuscated_standardized_fullpath = None
+    obfuscated_filename_stem = None
 
-    import ffmpeg
-    # Prepare fullpath for Conversion Fodler
-    new_location_fullpath = os.path.join(dir_format_conversion, pathlib.Path(obfuscated_encrypted_fullpath).name)
-    # Move original file to the conversion folder
-    os.replace(obfuscated_encrypted_fullpath, new_location_fullpath)
-    obfuscated_encrypted_fullpath = new_location_fullpath
-    obfuscated_filename_stem = pathlib.Path(obfuscated_encrypted_fullpath).stem
+    transcript_text_only_file_fullname = None
+    transcript_conversation_turns_file_fullname = None
+    subtitle_vtt_file_fullname = None
+    subtitle_srt_file_fullname = None
+
     try:
-        # First standardize file to mp3
+        # Prepare fullpath for conversion folder
+        new_location_fullpath = os.path.join(
+            dir_format_conversion,
+            pathlib.Path(obfuscated_encrypted_fullpath).name
+        )
+
+        # Move original file to the conversion folder
+        os.replace(obfuscated_encrypted_fullpath, new_location_fullpath)
+        obfuscated_encrypted_fullpath = new_location_fullpath
+
+        obfuscated_filename_stem = pathlib.Path(obfuscated_encrypted_fullpath).stem
+
+        # Decrypt original file bytes
         decrypted_original_file_bytes = get_decrypted_bytes(obfuscated_encrypted_fullpath)
+
         # Overwrite same file with decrypted data
         with open(obfuscated_encrypted_fullpath, "wb") as f:
             f.write(decrypted_original_file_bytes)
+
         obfuscated_decrypted_fullpath = obfuscated_encrypted_fullpath
 
-        # Write a standardized mp3 file
-        obfuscated_standardized_fullpath = pathlib.Path(dir_in_progress, obfuscated_filename_stem + '.mp3')
-        stream = ffmpeg.input(obfuscated_decrypted_fullpath)
-        stream = ffmpeg.output(stream, str(obfuscated_standardized_fullpath))
-        ffmpeg.run(stream)
-        # Delete original file
-        pathlib.Path.unlink(obfuscated_decrypted_fullpath)
+        # Write a standardized small Opus file
+        obfuscated_standardized_fullpath = pathlib.Path(
+            dir_in_progress,
+            obfuscated_filename_stem + ".opus"
+        )
+
+        stream = ffmpeg.input(obfuscated_decrypted_fullpath).audio
+
+        stream = ffmpeg.output(
+            stream,
+            str(obfuscated_standardized_fullpath),
+            **{
+                "ac": 1,
+                "ar": 16000,
+                "c:a": "libopus",
+                "b:a": "24k",
+            }
+        )
+
+        try:
+            ffmpeg.run(
+                stream,
+                overwrite_output=True,
+                capture_stdout=True,
+                capture_stderr=True
+            )
+        except ffmpeg.Error as ffmpeg_error:
+            stderr = (
+                ffmpeg_error.stderr.decode("utf-8", errors="replace")
+                if ffmpeg_error.stderr
+                else ""
+            )
+            logger.error(f"FFmpeg Opus conversion failed:\n{stderr}", exc_info=True)
+            raise RuntimeError(f"FFmpeg Opus conversion failed:\n{stderr}") from ffmpeg_error
+
+        # Delete decrypted original only after successful conversion
+        mws_helpers.safe_unlink(obfuscated_decrypted_fullpath, "decrypted original file")
+        obfuscated_decrypted_fullpath = None
 
         # Get starting time
         loop_start_time = time.time()
 
         # Start transcription
         transcription_result_paths = transcribe_file(obfuscated_standardized_fullpath, sidecar_path)
+        if not transcription_result_paths:
+            logger.error("transcribe_file did not return result paths", exc_info=True)
+            raise RuntimeError("transcribe_file did not return result paths")
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
         duration_seconds = transcription_result_paths[2]
@@ -455,10 +674,14 @@ def process_file(obfuscated_encrypted_fullpath):
         subtitle_srt_file = transcription_result_paths[5]
         summary_file = transcription_result_paths[6]
 
+        # transcribe_file deletes the standardized Opus file after successful transcription
+        obfuscated_standardized_fullpath = None
+
         # Gather file info for message
-        if not duration_seconds:  # Safely get duration
+        if not duration_seconds:
             duration_minutes = 0
             message_text_for_later = "Could not read duration for file"
+            logger.warning(message_text_for_later)
         else:
             duration_minutes = round(duration_seconds / 60, 2)
             message_text_for_later = f"{duration_minutes} min. long"
@@ -474,20 +697,22 @@ def process_file(obfuscated_encrypted_fullpath):
         else:
             email_text = configs['texts']['whisper']['email_text_one_file']
 
-        # Extract Email Address and File Name from Base Name (Last Path Component)
+        # Extract Email Address and File Name from Base Name
         clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
         email_address = clarified_stem.split('#', 8)[2]
         file_name = clarified_stem.split('#', 9)[9]
 
         # Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
+
         if len(subject_ready) > 75:
             email_subject = subject_ready[:75] + '...'
         else:
             email_subject = subject_ready
 
-        # Prepare attachments (with custom email filenames)
+        # Prepare attachments with custom email filenames
         attachments = []
+
         # Text-only transcript
         attachments.append(
             (
@@ -496,7 +721,7 @@ def process_file(obfuscated_encrypted_fullpath):
             )
         )
 
-        # Conversation turns transcript (optional)
+        # Conversation turns transcript, optional
         if transcript_conversation_turns_file_fullname is not None:
             attachments.append(
                 (
@@ -513,9 +738,8 @@ def process_file(obfuscated_encrypted_fullpath):
                 )
             )
 
-        # Send the results of transcribing
-        # Subtitle files (optional)
-        if subtitle_srt_file is not None:
+        # Subtitle files, optional
+        if subtitle_srt_file_fullname is not None:
             attachments.append(
                 (
                     subtitle_srt_file,
@@ -523,7 +747,7 @@ def process_file(obfuscated_encrypted_fullpath):
                 )
             )
 
-        if subtitle_vtt_file is not None:
+        if subtitle_vtt_file_fullname is not None:
             attachments.append(
                 (
                     subtitle_vtt_file,
@@ -531,99 +755,197 @@ def process_file(obfuscated_encrypted_fullpath):
                 )
             )
 
-        # # Send the results of transcribing
-        # try:
-        #     mws_helpers.send_mail(configs['email']['noreply_email'], [email_address], email_subject, email_text,
-        #                           attachments)
-        # except Exception as e:
-        #     if configs['telegram']['use_telegram'] == True:
-        #         mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
-        #                                           f"({getpass.getuser()}) - Transcription was successfull, but an error occured when we tried to send an email")
-        #     e_type, e_object, e_traceback = sys.exc_info()
-        #     e_line_number = e_traceback.tb_lineno
-        #     error_message_for_admins = f"({getpass.getuser()}) - Following error happened when trying to send the email: {e.__class__.__name__}.{new_line_for_f_strings}{new_line_for_f_strings}Error araised on line: {e_line_number}{new_line_for_f_strings}{new_line_for_f_strings}{e}"
-        #     if configs['telegram']['use_telegram'] == True:
-        #         mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
-        #     # Copy transcription results to local testings folder
-        #     if transcript_conversation_turns_file_fullname is not None:
-        #         files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname,
-        #                       subtitle_vtt_file, subtitle_srt_file, summary_file]
-        #     else:
-        #         files_list = [transcript_text_only_file_fullname, subtitle_vtt_file, subtitle_srt_file, summary_file]
-        #     #####files_list = [transcript_text_only_file_fullname, transcript_conversation_turns_file_fullname] if transcript_conversation_turns_file_fullname is not None else [transcript_text_only_file_fullname]
-        #     for results_file in files_list:
-        #         if results_file is not None:
-        #             try:
-        #                 # Copy the file
-        #                 shutil.copy(results_file, os.path.join(mws_helpers.ProjectPaths().local_tests_folder_path,
-        #                                                        os.path.basename(results_file)))
-        #             except FileNotFoundError:
-        #                 print("Source file not found!")
-        #             except PermissionError:
-        #                 print("Permission denied!")
-        #             except Exception as e:
-        #                 print(f"An error occurred: {e}")
+        # Send the results of transcribing
+        try:
+            mws_helpers.send_mail(
+                configs['email']['noreply_email'],
+                [email_address],
+                email_subject,
+                email_text,
+                attachments
+            )
 
-        # Delete Word files after sending them
-        pathlib.Path.unlink(transcript_text_only_file_fullname)
+        except Exception as e:
+            logger.error('Could not send email', exc_info=True)
+            notify_admins(
+                f"({getpass.getuser()}) - Transcription was successful, "
+                f"but an error occurred when trying to send the email"
+            )
 
-        if transcript_conversation_turns_file_fullname is not None:
-            pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
+            e_type, e_object, e_traceback = sys.exc_info()
+            e_line_number = e_traceback.tb_lineno
 
-        if subtitle_srt_file is not None and os.path.exists(subtitle_srt_file):
-            pathlib.Path.unlink(subtitle_srt_file)
+            error_message_for_admins = (
+                f"({getpass.getuser()}) - Following error happened when trying to send the email: "
+                f"{e.__class__.__name__}."
+                f"{new_line_for_f_strings}{new_line_for_f_strings}"
+                f"Error raised on line: {e_line_number}"
+                f"{new_line_for_f_strings}{new_line_for_f_strings}"
+                f"{e}"
+            )
 
-        if subtitle_vtt_file is not None and os.path.exists(subtitle_vtt_file):
-            pathlib.Path.unlink(subtitle_vtt_file)
-        # pathlib.Path.unlink(transcript_text_only_file_fullname)
-        # if transcript_conversation_turns_file_fullname is not None:
-        #     pathlib.Path.unlink(transcript_conversation_turns_file_fullname)
-        # Send notification
+            notify_admins(error_message_for_admins)
 
+            # Copy transcription results to local testing folder
+            files_list = [
+                transcript_text_only_file_fullname,
+                transcript_conversation_turns_file_fullname,
+                subtitle_vtt_file_fullname,
+                subtitle_srt_file_fullname,
+            ]
+
+            files_list = [f for f in files_list if f is not None]
+
+            for results_file in files_list:
+                try:
+                    shutil.copy(
+                        results_file,
+                        os.path.join(
+                            mws_helpers.ProjectPaths().local_tests_folder_path,
+                            os.path.basename(results_file)
+                        )
+                    )
+                except FileNotFoundError:
+                    logger.error('Source file not found!', exc_info=True)
+                except PermissionError:
+                    logger.error('Permission denied!', exc_info=True)
+                except Exception as copy_error:
+                    logger.error(f'An error occurred while copying {results_file}: {copy_error}', exc_info=True)
+
+        # Delete Word and subtitle files after sending/copying them
+        mws_helpers.safe_unlink(transcript_text_only_file_fullname, "text-only transcript DOCX file")
+        transcript_text_only_file_fullname = None
+
+        mws_helpers.safe_unlink(
+            transcript_conversation_turns_file_fullname,
+            "conversation-turns transcript DOCX file"
+        )
+        transcript_conversation_turns_file_fullname = None
+
+        mws_helpers.safe_unlink(subtitle_srt_file_fullname, "SRT subtitle file")
+        subtitle_srt_file_fullname = None
+
+        mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
+        subtitle_vtt_file_fullname = None
         if summary_file is not None and os.path.exists(summary_file):
             pathlib.Path.unlink(summary_file)
 
         if sidecar_path.exists():
             sidecar_path.unlink()
         # Send notification
-        if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'],
-                                              f'({getpass.getuser()}) - A file has been successfully transcribed ({message_text_for_later})')
-    except Exception as e:
-        # Get exception infos
+        count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
+        count_in_progress, _ = mws_helpers.count_processing_jobs()
+        notify_admins(
+            f'({getpass.getuser()}) - A file has been successfully transcribed '
+            f'({message_text_for_later})\n'
+            f"Files Waiting: {count_unprocessed}\n"
+            f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
+
+        )
+
+    except Exception:
+        logger.critical('Could not process file!', exc_info=True)
         error_string = traceback.format_exc()
         error_message_for_admins = f"({getpass.getuser()}) - {error_string}"
-        if configs['telegram']['use_telegram'] == True:
-            mws_helpers.send_telegram_message(configs['telegram']['admin_chat_id'], error_message_for_admins)
+        notify_admins(error_message_for_admins)
+
+        # Inform the user by email that processing failed. This covers all failure
+        # modes (decryption, FFmpeg conversion, transcription)
+        try:
+            error_mail_clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
+            error_mail_address = error_mail_clarified_stem.split('#', 8)[2]
+
+            error_email_subject = configs['texts']['whisper']['email_subject_error']
+            error_email_text = configs['texts']['whisper']['email_text_error']
+
+            mws_helpers.send_mail(
+                configs['email']['noreply_email'],
+                [error_mail_address],
+                error_email_subject,
+                error_email_text
+            )
+
+        except Exception as error_mail_exception:
+            logger.error(f"Could not send error notification email: {error_mail_exception}", exc_info=True)
+
+        # Cleanup files that may have remained after an error
+        mws_helpers.safe_unlink(obfuscated_decrypted_fullpath, "decrypted original file")
+        mws_helpers.safe_unlink(obfuscated_standardized_fullpath, "standardized Opus file")
+
+        mws_helpers.safe_unlink(transcript_text_only_file_fullname, "text-only transcript DOCX file")
+        mws_helpers.safe_unlink(
+            transcript_conversation_turns_file_fullname,
+            "conversation-turns transcript DOCX file"
+        )
+        mws_helpers.safe_unlink(subtitle_srt_file_fullname, "SRT subtitle file")
+        mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
+
+    finally:
+        # This is the important part:
+        # one finished daemon process = remove one active-job marker.
+        mws_helpers.safe_unlink(processing_marker_fullpath)
 
 
 def main():
     from multiprocessing import Process
 
     count_temp_orig_files = 1
+    # Clean old job markers once when the daemon starts.
+    # This prevents old .job files from blocking processing after a restart.
+    mws_helpers.cleanup_processing_markers()
 
     # Infinite Loop
     while count_temp_orig_files > 0:
-        # Define seconds to sleep
         seconds = 10
-        # If there are less than 2 videos currently in progress, then check if there are any new uploaded files to start new transcription process
-        count_files_in_proggress, _ = mws_helpers.count_and_list_files(dir_in_progress)
+        # Count active jobs by .job marker files only
+        count_files_in_proggress, _ = mws_helpers.count_processing_jobs()
         if count_files_in_proggress < configs['features']['max_files_processed_simultaneously']:
             # List unprocessed files
-            count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(dir_temp_orig_files)
+            count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(
+                dir_temp_orig_files
+            )
             count_temp_orig_files = mws_helpers.count_and_list_files_maintenance(dir_temp_orig_files)
 
-            # Get the name of the next unprocessed file
             if count_unprocessed >= 1:
                 fullname_of_next_unprocessed_file = unprocessed_files[0]
-                another_daemon_process = Process(target=process_file, args=(fullname_of_next_unprocessed_file,))
+
+                # Create the processing marker BEFORE starting the worker process.
+                # This makes the count increase immediately.
+                processing_marker_fullpath = mws_helpers.create_processing_marker(
+                    fullname_of_next_unprocessed_file
+                )
+
+                another_daemon_process = Process(
+                    target=process_file,
+                    args=(
+                        fullname_of_next_unprocessed_file,
+                        processing_marker_fullpath
+                    )
+                )
+
                 another_daemon_process.daemon = True
-                another_daemon_process.start()
-                print(
-                    f"Something has been loaded and we created a new daemon process for it! Let's sleep again for {seconds} seconds till the next check...")
+
+                try:
+                    another_daemon_process.start()
+                except Exception:
+                    # If the process could not start, remove the marker again.
+                    mws_helpers.safe_unlink(processing_marker_fullpath)
+                    logger.error('Could not start daemon process', exc_info=True)
+                    raise
+
+                logger.debug(
+                    f"Something has been loaded and we created a new daemon process for it! "
+                    f"Active jobs: {count_files_in_proggress + 1}. "
+                    f"Let's sleep again for {seconds} seconds till the next check..."
+                )
+
             else:
-                print(
-                    f"Well... Nothing was loaded in the meanwhile! Let's sleep again for {seconds} seconds till the next check...")
+                logger.debug(
+                    f"Well... Nothing was loaded in the meanwhile! "
+                    f"Active jobs: {count_files_in_proggress}. "
+                    f"Let's sleep again for {seconds} seconds till the next check..."
+                )
+
         time.sleep(seconds)
 
 
