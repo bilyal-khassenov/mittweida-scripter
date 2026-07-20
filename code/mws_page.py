@@ -212,6 +212,9 @@ def main():
         # Create two columns for subtitles & summary generation
         summary_column, summary_language, _, _, _ = st.columns([1, 1, 1, 1, 1])
         #Placeholder for Summarization Area
+        summary_languages = [texts_from_config_file['summary_language_code_selectbox_default_option']] + sorted(
+            [lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
+
         #Language Selection Area
         capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:

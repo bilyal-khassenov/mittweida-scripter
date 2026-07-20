@@ -110,12 +110,12 @@ def chunk_text_tokens(text, max_tokens=2000):
 
 
 def summarize_chunk(text, prompt_hint, summary_language, compression=0.2):
-    nwords_summary = max(150, int(compression * word_count(text)))
-    print("Anzahl der WÃ¶rter: ")
-    print(nwords_summary)
+    maximum_words = max(150, int(compression * word_count(text)))
+    logger.debug("Anzahl der Wörter: ")
+    logger.debug(maximum_words)
 
     prompt = (
-        f"Your goal is to summarize the given text in maximum {nwords_summary} words. "
+        f"Your goal is to summarize the given text in maximum {maximum_words} words. "
         "Extract only the most important information. "
         f"Only output the summary without any additional text. Answer in {summary_language} only. "
     )
@@ -161,9 +161,8 @@ def hierarchical_reduce(texts, prompt_hint, summary_language, group_size=5, comp
 
 
 def summarize_file(input_data, original_file_path, prompt_hint, summary_language):
-    final_text = ""
     chunks = chunk_text_tokens(input_data, max_tokens=2000)
-    print(f"Chunks: {len(chunks)}")
+    logger.debug(f"Chunks: {len(chunks)}")
 
     if len(chunks) == 1:
         final_text = summarize_chunk(chunks[0], prompt_hint, summary_language, compression=0.3)
@@ -179,7 +178,7 @@ def summarize_file(input_data, original_file_path, prompt_hint, summary_language
 
 
 
-def transcribe_file(obfuscated_standardized_fullpath):
+def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
     logger.debug("Transcribing file...")
     obfuscated_standardized_fullpath = pathlib.Path(obfuscated_standardized_fullpath)
     obfuscated_diarization_wav_fullpath = None
@@ -263,8 +262,6 @@ def transcribe_file(obfuscated_standardized_fullpath):
         # Create summary if requested
         summary_file = None
         if summary_setting == 1:
-            prompt_hint = ""
-            summary_language = ""
             if sidecar_path.exists():
                 with open(sidecar_path, 'r', encoding='utf-8') as f:
                     sidecar = json.load(f)
@@ -546,7 +543,8 @@ def transcribe_file(obfuscated_standardized_fullpath):
             file_duration,
             file_size,
             subtitle_vtt_file,
-            subtitle_srt_file
+            subtitle_srt_file,
+            summary_file
         ]
 
     except Exception:
@@ -596,6 +594,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
     transcript_conversation_turns_file_fullname = None
     subtitle_vtt_file_fullname = None
     subtitle_srt_file_fullname = None
+    summary_file_fullname = None
 
     try:
         # Prepare fullpath for conversion folder
@@ -670,9 +669,9 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
         duration_seconds = transcription_result_paths[2]
         file_size = transcription_result_paths[3]
-        subtitle_vtt_file = transcription_result_paths[4]
-        subtitle_srt_file = transcription_result_paths[5]
-        summary_file = transcription_result_paths[6]
+        subtitle_vtt_file_fullname = transcription_result_paths[4]
+        subtitle_srt_file_fullname = transcription_result_paths[5]
+        summary_file_fullname = transcription_result_paths[6]
 
         # transcribe_file deletes the standardized Opus file after successful transcription
         obfuscated_standardized_fullpath = None
@@ -730,10 +729,10 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 )
             )
 
-        if summary_file is not None:
+        if summary_file_fullname is not None:
             attachments.append(
                 (
-                    summary_file,
+                    summary_file_fullname,
                     f"{file_name}{configs['texts']['whisper']['summary_attachment_postfix']}.docx"
                 )
             )
@@ -742,7 +741,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         if subtitle_srt_file_fullname is not None:
             attachments.append(
                 (
-                    subtitle_srt_file,
+                    subtitle_srt_file_fullname,
                     f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.srt"
                 )
             )
@@ -750,7 +749,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         if subtitle_vtt_file_fullname is not None:
             attachments.append(
                 (
-                    subtitle_vtt_file,
+                    subtitle_vtt_file_fullname,
                     f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.vtt"
                 )
             )
@@ -792,6 +791,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 transcript_conversation_turns_file_fullname,
                 subtitle_vtt_file_fullname,
                 subtitle_srt_file_fullname,
+                summary_file_fullname
             ]
 
             files_list = [f for f in files_list if f is not None]
@@ -827,11 +827,13 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
 
         mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
         subtitle_vtt_file_fullname = None
-        if summary_file is not None and os.path.exists(summary_file):
-            pathlib.Path.unlink(summary_file)
 
-        if sidecar_path.exists():
-            sidecar_path.unlink()
+        mws_helpers.safe_unlink(summary_file_fullname, "SUMMARY file")
+        summary_file_fullname = None
+
+        mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
+        sidecar_path = None
+
         # Send notification
         count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
         count_in_progress, _ = mws_helpers.count_processing_jobs()
@@ -879,6 +881,9 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         )
         mws_helpers.safe_unlink(subtitle_srt_file_fullname, "SRT subtitle file")
         mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
+
+        mws_helpers.safe_unlink(summary_file_fullname, "SUMMARY file")
+        mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
 
     finally:
         # This is the important part:
