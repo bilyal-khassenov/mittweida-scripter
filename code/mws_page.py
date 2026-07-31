@@ -206,8 +206,8 @@ def main():
     if data_protection_agreed:
         st.markdown(normal_style, unsafe_allow_html=True)
         # Show maintenance dialog, comment out if not needed
-        if st.session_state.maintenance:
-            maintenance_dialog("31.07.26")
+        #if st.session_state.maintenance:
+            #maintenance_dialog("31.07.26")
     else:
         st.markdown(grey_style, unsafe_allow_html=True)
 
@@ -215,8 +215,8 @@ def main():
     if "form_elements_disabled" not in st.session_state:
         st.session_state.disabled = False
 
-    if "maintenance" not in st.session_state:
-        st.session_state.maintenance = True
+    #if "maintenance" not in st.session_state:
+        #st.session_state.maintenance = True
 
     # Main form
     with st.form(key="Form :", clear_on_submit=False):
