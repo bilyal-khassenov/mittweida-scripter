@@ -13,6 +13,10 @@
         "admin_chat_id": ["PLACEHOLDER1", "PLACEHOLDER2"],
         "bot_token": "PLACEHOLDER"
     },
+    "maintenance": {
+        "use_maintenance": false,
+        "date": "PLACEHOLDER"
+    },
     "features": {
         "high_confidence_level_lower_bound": -0.4,
         "average_confidence_level_lower_bound": -0.6,

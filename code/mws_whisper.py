@@ -647,10 +647,20 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
 
         # Subtitle files, optional
         if subtitle_srt_file_fullname is not None:
-            attachments.append(subtitle_srt_file_fullname)
+            attachments.append(
+                (
+                subtitle_srt_file_fullname,
+                f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.srt"
+                )
+            )
 
         if subtitle_vtt_file_fullname is not None:
-            attachments.append(subtitle_vtt_file_fullname)
+            attachments.append(
+                (
+                subtitle_vtt_file_fullname,
+                f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.vtt"
+                )
+            )
 
         # Send the results of transcribing
         try:

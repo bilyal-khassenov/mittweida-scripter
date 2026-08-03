@@ -169,14 +169,19 @@ def stats_area():
             st.info("Please upload a CSV file to get started.")
 
 
+def maintenance(date):
+    if configs['maintenance']['use_maintenance']:
+        maintenance_dialog(date)
+
 @st.dialog("Wichtige Informationen")
 def maintenance_dialog(date):
-    st.markdown(
-        f"<h4 class='no-fade'>Aufgrund von Wartungsarbeiten ist der Mittweida Scripter am {date} nicht erreichbar. </h4>",
-        unsafe_allow_html=True)
-    if st.button("Bestätigen"):
-        st.session_state.maintenance = False
-        st.rerun()
+    if configs['maintenance']['use_maintenance']:
+        st.markdown(
+            f"<h4 class='no-fade'>Aufgrund von Wartungsarbeiten ist der Mittweida Scripter am {date} nicht erreichbar. </h4>",
+            unsafe_allow_html=True)
+        if st.button("Bestätigen"):
+            st.session_state.maintenance = False
+            st.rerun()
 
 
 def main():
@@ -206,8 +211,8 @@ def main():
     if data_protection_agreed:
         st.markdown(normal_style, unsafe_allow_html=True)
         # Show maintenance dialog, comment out if not needed
-        #if st.session_state.maintenance:
-            #maintenance_dialog("31.07.26")
+        if st.session_state.maintenance:
+            maintenance(configs['maintenance']['date'])
     else:
         st.markdown(grey_style, unsafe_allow_html=True)
 
@@ -215,8 +220,8 @@ def main():
     if "form_elements_disabled" not in st.session_state:
         st.session_state.disabled = False
 
-    #if "maintenance" not in st.session_state:
-        #st.session_state.maintenance = True
+    if "maintenance" not in st.session_state:
+        st.session_state.maintenance = True
 
     # Main form
     with st.form(key="Form :", clear_on_submit=False):
