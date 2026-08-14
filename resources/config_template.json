@@ -87,7 +87,8 @@
             "text_only_attachment_postfix": "_text_only",
             "conversation_turns_attachment_postfix": "_conversation_turns",
             "summary_attachment_postfix": "_summary",
-            "subtitle_attachment_postfix": "_subtitles"
+            "subtitle_attachment_postfix": "_subtitles",
+            "summary_prompt": "Your goal is to summarize the given text in maximum {maximum_words} words. Extract only the most important information. Only output the summary without any additional text. Answer in {summary_language} only. "
         }
     }
   }

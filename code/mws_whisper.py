@@ -114,10 +114,9 @@ def summarize_chunk(text, prompt_hint, summary_language, compression=0.2):
     logger.debug("Anzahl der Wörter: ")
     logger.debug(maximum_words)
 
-    prompt = (
-        f"Your goal is to summarize the given text in maximum {maximum_words} words. "
-        "Extract only the most important information. "
-        f"Only output the summary without any additional text. Answer in {summary_language} only. "
+    prompt = configs['texts']['whisper']['summary_prompt'].format(
+        maximum_words=maximum_words,
+        summary_language=summary_language
     )
 
     system_prompt = prompt + prompt_hint
@@ -267,7 +266,7 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
                     sidecar = json.load(f)
             prompt_hint = sidecar.get("prompt_hint", "")
             summary_language = sidecar.get("summary_language", "")
-            print("Creating summary...")
+            logger.debug("Creating Summary...")
             summary_file = summarize_file(result["text"], transcript_text_only_file_fullname, prompt_hint,
                                           summary_language)
 
