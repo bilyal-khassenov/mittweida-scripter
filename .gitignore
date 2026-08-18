@@ -22,3 +22,13 @@ code/tests.py
 
 # idea folder, uncomment if you don't need it
 /.idea/
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/

@@ -1,5 +1,5 @@
 # IMPORT STANDARD MODULES
-import os, pathlib, time, re, getpass
+import os, pathlib, time, re, getpass, json
 import streamlit as st, pandas as pd
 from PIL import Image
 from datetime import datetime
@@ -233,10 +233,13 @@ def main():
         language_column, model_column, diarization_column, subtitle_column, translation_column = st.columns(
             [1, 1, 1, 1, 1])  # Adjust width ratios if needed
         # Create two columns for subtitles & summary generation
-        # Placeholder for Summarization Area
-        # Language Selection Area
-        capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted(
+        summary_column, summary_language, _, _, _ = st.columns([1, 1, 1, 1, 1])
+        #Placeholder for Summarization Area
+        summary_languages = [texts_from_config_file['summary_language_code_selectbox_default_option']] + sorted(
             [lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
+
+        #Language Selection Area
+        capitalized_languages = [texts_from_config_file['language_code_selectbox_default_option']] + sorted([lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
         with language_column:
             language_name = st.selectbox(texts_from_config_file['language_code_selectbox_label'], capitalized_languages)
         # Model Selection Area
@@ -253,8 +256,27 @@ def main():
                                             options=[texts_from_config_file['no'], texts_from_config_file['yes']])
         # Translation Selection Area
         with translation_column:
-            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'],
-                                               [texts_from_config_file['no'], texts_from_config_file['yes']])
+            translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
+        # Summary Setting Area
+        with summary_column:
+            summary_setting = st.selectbox(
+                texts_from_config_file['summary_selectbox_label'],
+                options=[texts_from_config_file['no'], texts_from_config_file['yes']],
+                disabled=any([st.session_state.disabled, data_protection_agreed != True])
+            )
+        with summary_language:
+            summary_language_name = st.selectbox(
+                texts_from_config_file['summary_language_selectbox_label'],
+                options=summary_languages,
+                disabled=any([st.session_state.disabled, data_protection_agreed != True])
+            )
+
+        prompt_hint = st.text_area(
+            "Hinweise zur Zusammenfassung (optional)",
+            placeholder="Fachbegriffe, Sprechernamen...",
+            disabled=any([st.session_state.disabled, data_protection_agreed != True]),
+            max_chars=500
+        )
 
         # Upload section
         uploaded_file = st.file_uploader(
@@ -271,9 +293,9 @@ def main():
     # Action on submitting
     if submit_button:
         if email_address_textbox == '':
-            st.error(texts_from_config_file['error_username_not_provided'], icon="ðŸš¨")
+            st.error(texts_from_config_file['error_username_not_provided'], icon="🚨")
         elif uploaded_file is None:
-            st.error(texts_from_config_file['error_file_not_selected'], icon="ðŸš¨")
+            st.error(texts_from_config_file['error_file_not_selected'], icon="🚨")
         elif re.compile(r'^\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b$').search(
                 email_address_textbox):  # If it is a valid e-mail address
             with st.spinner(texts_from_config_file['uploading_file_process_spinner_label']):  # Show spinner
@@ -303,11 +325,12 @@ def main():
                 diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
                 # Subtitle Setting
                 subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
-
+                # Summary Setting
+                summary_setting = "1" if summary_setting == texts_from_config_file['yes'] else "0"
                 # Obtain transcription model code
                 transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
                 # Combine file name from compenents
-                plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{subtitle_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[
+                plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{subtitle_setting}#{summary_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[
                     0:120]
                 plain_structured_original_file_name = plain_structured_original_file_name_stem + file_extension_of_originally_uploaded_file
                 # Obfuscated
@@ -326,6 +349,14 @@ def main():
                 # Temporarily save audio file to gather info
                 with open(obfuscated_file_fullpath_orig_postfix, mode='wb') as w:
                     w.write(uploaded_file.getvalue())
+
+                sidecar_path = obfuscated_file_fullpath_orig_postfix.with_suffix('.json')
+                sidecar_data = {
+                    "prompt_hint": prompt_hint,
+                    "summary_language": summary_language_name
+                }
+                with open(sidecar_path, 'w', encoding='utf-8') as f:
+                    json.dump(sidecar_data, f, ensure_ascii=False, indent=2)
 
                 # Gather file info
                 media_info = mws_helpers.get_media_info(obfuscated_file_fullpath_orig_postfix)
@@ -357,50 +388,66 @@ def main():
                                      'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
                                      'translation_status': translation_setting,
                                      'diarization_status': diarization_setting,
-                                     'subtitles_status': subtitle_setting,
                                      'transcription_model': transcription_model}]
 
-                # Register new record - transform it to a dataframe
-                new_record_df = pd.DataFrame(new_order_record)
-                # Check if protocol exists. If not, create it
-                mws_helpers.make_sure_protocols_exist()
-                # Read protocol
-                protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
-                # Concatanate protocol records
-                result = pd.concat([protocol, new_record_df])
-                # Save new state of the protocol
-                result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
+            #Prepare New Protocol Record
+            try:
+                institution_referer = st.context.headers[configs['header_names']['identity_provider']]
+            except:
+                institution_referer = '--'
+            # Prepare new protocol record
+            new_order_record = [{'upload_timestamp': time.time(),
+                                 'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
+                                 'duration_seconds': duration_seconds,
+                                 'file_size': file_size,
+                                 'institution': institution_referer,
+                                 'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
+                                 'translation_status': translation_setting,
+                                 'diarization_status': diarization_setting,
+                                 'subtitles_status': subtitle_setting,
+                                 'transcription_model': transcription_model}]
 
-                # Send notification to Admin to let him know a new file has been uploaded for Transcription
-                if configs['telegram']['use_telegram'] == True:
-                    count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
-                    count_in_progress, _ = mws_helpers.count_processing_jobs()
+            # Register new record - transform it to a dataframe
+            new_record_df = pd.DataFrame(new_order_record)
+            # Check if protocol exists. If not, create it
+            mws_helpers.make_sure_protocols_exist()
+            # Read protocol
+            protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
+            # Concatanate protocol records
+            result = pd.concat([protocol, new_record_df])
+            # Save new state of the protocol
+            result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
 
-                    duration_minutes_for_message = (
-                        round(duration_seconds / 60, 2)
-                        if duration_seconds is not None
-                        else "unknown"
-                    )
+            # Send notification to Admin to let him know a new file has been uploaded for Transcription
+            if configs['telegram']['use_telegram'] == True:
+                count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
+                count_in_progress, _ = mws_helpers.count_processing_jobs()
 
-                    mws_helpers.send_telegram_message(
-                        configs['telegram']['admin_chat_id'],
-                        f"NEW FILE HAS BEEN UPLOADED\n"
-                        f"Machine: {getpass.getuser()}\n"
-                        f"Institution: {institution_referer}\n"
-                        f"Duration in Minutes: {duration_minutes_for_message}\n"
-                        f"Language Code: {mws_helpers.get_language_setting_index_or_code(language_setting)}\n"
-                        f"Transcription Model: {transcription_model}\n"
-                        f"Diarization Status: {diarization_setting}\n"
-                        f"Translation Status: {translation_setting}\n"
-                        f"Subtitles Status: {subtitle_setting}\n"
-                        f"Files Waiting: {count_unprocessed}\n"
-                        f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
-                    )
+                duration_minutes_for_message = (
+                    round(duration_seconds / 60, 2)
+                    if duration_seconds is not None
+                    else "unknown"
+                )
 
-                # Success message for user
-                st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
+                mws_helpers.send_telegram_message(
+                    configs['telegram']['admin_chat_id'],
+                    f"NEW FILE HAS BEEN UPLOADED\n"
+                    f"Machine: {getpass.getuser()}\n"
+                    f"Institution: {institution_referer}\n"
+                    f"Duration in Minutes: {duration_minutes_for_message}\n"
+                    f"Language Code: {mws_helpers.get_language_setting_index_or_code(language_setting)}\n"
+                    f"Transcription Model: {transcription_model}\n"
+                    f"Diarization Status: {diarization_setting}\n"
+                    f"Translation Status: {translation_setting}\n"
+                    f"Subtitles Status: {subtitle_setting}\n"
+                    f"Files Waiting: {count_unprocessed}\n"
+                    f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
+                )
+
+            # Success message for user
+            st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
         else:
-            print(st.error(texts_from_config_file['error_wrong_email'], icon="ðŸš¨"))
+            print(st.error(texts_from_config_file['error_wrong_email'], icon="🚨"))
 
     # Further Page Areas
     stats_area()

@@ -1,22 +1,15 @@
 # Import main packages
-import pathlib
-import os
-import sys
-import time
-import datetime
-import shutil
-import torch
-import pandas
-import whisper
-import getpass
-import traceback
+import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback, json, tiktoken
 import ffmpeg
-
 from mutagen.oggopus import OggOpus
 from docx.enum.text import WD_COLOR_INDEX
 from docx import Document
 from docx.shared import Pt
 from whisper.utils import get_writer
+from ollama import chat
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+######from docx.document import Document #Keep it for Intellisense!
 ###### from docx.document import Document # Keep it for Intellisense!
 
 # Import helper functions
@@ -32,6 +25,7 @@ dir_processed = mws_helpers.ProjectPaths().processed_folder_path
 dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
 configs = mws_helpers.get_configs()
+enc = tiktoken.get_encoding("cl100k_base")
 
 #create logger
 logger = mws_helpers.create_logger(__name__)
@@ -102,7 +96,88 @@ def diarize_timestamped_words(conversation_turns, timestamped_words):
     return conversation_turns
 
 
-def transcribe_file(obfuscated_standardized_fullpath):
+def word_count(text):
+    return len(text.split())
+
+
+def chunk_text_tokens(text, max_tokens=2000):
+    tokens = enc.encode(text)
+    chunks = []
+    for i in range(0, len(tokens), max_tokens):
+        chunk_tokens = tokens[i:i + max_tokens]
+        chunks.append(enc.decode(chunk_tokens))
+    return chunks
+
+
+def summarize_chunk(text, prompt_hint, summary_language, compression=0.2):
+    maximum_words = max(150, int(compression * word_count(text)))
+    logger.debug("Anzahl der Wörter: ")
+    logger.debug(maximum_words)
+
+    prompt = configs['texts']['whisper']['summary_prompt'].format(
+        maximum_words=maximum_words,
+        summary_language=summary_language
+    )
+
+    system_prompt = prompt + prompt_hint
+
+    response = chat(
+        model='gemma4:e4b',
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text}
+        ]
+    )
+
+    return response['message']['content']
+
+
+def hierarchical_reduce(texts, prompt_hint, summary_language, group_size=5, compression=0.3, max_workers=4):
+    while len(texts) > 1:
+        groups = [texts[i:i + group_size] for i in range(0, len(texts), group_size)]
+
+        tasks = []
+        new_texts = [None] * len(groups)
+        for idx, group in enumerate(groups):
+            if len(group) == 1:
+                new_texts[idx] = group[0]
+            else:
+                tasks.append((idx, " ".join(group)))
+
+        if tasks:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(summarize_chunk, text, prompt_hint, summary_language, compression): idx
+                    for idx, text in tasks
+                }
+                for future in futures:
+                    idx = futures[future]
+                    new_texts[idx] = future.result()
+
+        texts = new_texts
+
+    return texts[0]
+
+
+def summarize_file(input_data, original_file_path, prompt_hint, summary_language):
+    chunks = chunk_text_tokens(input_data, max_tokens=2000)
+    logger.debug(f"Chunks: {len(chunks)}")
+
+    if len(chunks) == 1:
+        final_text = summarize_chunk(chunks[0], prompt_hint, summary_language, compression=0.3)
+    else:
+        final_text = hierarchical_reduce(chunks, prompt_hint, summary_language, group_size=5, compression=0.3)
+    new_file_name_stem = pathlib.Path(original_file_path).stem
+    summary_path = os.path.join(dir_processed, new_file_name_stem + "_summary.docx")
+    document = Document()
+    document.add_heading("Zusammenfassung", 0)
+    document.add_paragraph(final_text)
+    document.save(summary_path)
+    return summary_path
+
+
+
+def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
     logger.debug("Transcribing file...")
     obfuscated_standardized_fullpath = pathlib.Path(obfuscated_standardized_fullpath)
     obfuscated_diarization_wav_fullpath = None
@@ -116,32 +191,26 @@ def transcribe_file(obfuscated_standardized_fullpath):
         structured_filename = mws_helpers.clarify_string(obfuscated_stem)
 
         # Extract Language Code
-        language_code = mws_helpers.get_language_setting_index_or_code(
-            int(structured_filename.split('#', 8)[3])
-        )
-
+        language_code = mws_helpers.get_language_setting_index_or_code(int(structured_filename.split('#', 9)[3]))
         # Extract Translation Status
-        translation_status = int(structured_filename.split('#', 8)[4])
+        translation_status = int(structured_filename.split('#', 9)[4])
         translation_status = 'translate' if translation_status == 1 else None
-
         # Extract Diarization Setting
-        diarization_setting = int(structured_filename.split('#', 8)[5])
-
+        diarization_setting = int(structured_filename.split('#', 9)[5])
         # Extract Selected Transcription Model
         selected_transcription_model = mws_helpers.get_model_setting_index_or_name(
-            int(structured_filename.split('#', 8)[7])
-        )
+            int(structured_filename.split('#', 9)[8]))
 
         # Read Opus duration and size
         file_duration = OggOpus(str(obfuscated_standardized_fullpath)).info.length
         file_size = os.path.getsize(obfuscated_standardized_fullpath)
 
         # Extract subtitle Setting from Base Name
-        subtitle_setting = int(os.path.basename(structured_filename).split('#', 8)[6])
+        subtitle_setting = int(os.path.basename(structured_filename).split('#', 9)[6])
 
+        summary_setting = int(os.path.basename(structured_filename).split('#', 9)[7])
         # Load the model
         logger.debug("Loading Whisper...")
-
         if torch.cuda.is_available():
             whisper_model = whisper.load_model(selected_transcription_model).cuda().eval()
         else:
@@ -188,6 +257,18 @@ def transcribe_file(obfuscated_standardized_fullpath):
             + configs['texts']['whisper']['text_only_attachment_postfix']
             + '.docx'
         )
+
+        # Create summary if requested
+        summary_file = None
+        if summary_setting == 1:
+            if sidecar_path.exists():
+                with open(sidecar_path, 'r', encoding='utf-8') as f:
+                    sidecar = json.load(f)
+            prompt_hint = sidecar.get("prompt_hint", "")
+            summary_language = sidecar.get("summary_language", "")
+            logger.debug("Creating Summary...")
+            summary_file = summarize_file(result["text"], transcript_text_only_file_fullname, prompt_hint,
+                                          summary_language)
 
         document_text_only = Document()
 
@@ -461,7 +542,8 @@ def transcribe_file(obfuscated_standardized_fullpath):
             file_duration,
             file_size,
             subtitle_vtt_file,
-            subtitle_srt_file
+            subtitle_srt_file,
+            summary_file
         ]
 
     except Exception:
@@ -499,8 +581,9 @@ def get_decrypted_bytes(enc_file_fullpath):
 
     return decrypted_bytes
 
-
 def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None):
+    file_path = Path(obfuscated_encrypted_fullpath)
+    sidecar_path = file_path.with_suffix('.json')
     logger.debug('Processing file...')
     obfuscated_decrypted_fullpath = None
     obfuscated_standardized_fullpath = None
@@ -510,6 +593,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
     transcript_conversation_turns_file_fullname = None
     subtitle_vtt_file_fullname = None
     subtitle_srt_file_fullname = None
+    summary_file_fullname = None
 
     try:
         # Prepare fullpath for conversion folder
@@ -576,18 +660,17 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         loop_start_time = time.time()
 
         # Start transcription
-        transcription_result_paths = transcribe_file(obfuscated_standardized_fullpath)
-
+        transcription_result_paths = transcribe_file(obfuscated_standardized_fullpath, sidecar_path)
         if not transcription_result_paths:
             logger.error("transcribe_file did not return result paths", exc_info=True)
             raise RuntimeError("transcribe_file did not return result paths")
-
         transcript_text_only_file_fullname = transcription_result_paths[0]
         transcript_conversation_turns_file_fullname = transcription_result_paths[1]
         duration_seconds = transcription_result_paths[2]
         file_size = transcription_result_paths[3]
         subtitle_vtt_file_fullname = transcription_result_paths[4]
         subtitle_srt_file_fullname = transcription_result_paths[5]
+        summary_file_fullname = transcription_result_paths[6]
 
         # transcribe_file deletes the standardized Opus file after successful transcription
         obfuscated_standardized_fullpath = None
@@ -615,7 +698,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         # Extract Email Address and File Name from Base Name
         clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
         email_address = clarified_stem.split('#', 8)[2]
-        file_name = clarified_stem.split('#', 8)[8]
+        file_name = clarified_stem.split('#', 9)[9]
 
         # Prepare E-Mail subject
         subject_ready = f"{configs['texts']['whisper']['email_subject']}: {file_name}"
@@ -645,20 +728,28 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 )
             )
 
+        if summary_file_fullname is not None:
+            attachments.append(
+                (
+                    summary_file_fullname,
+                    f"{file_name}{configs['texts']['whisper']['summary_attachment_postfix']}.docx"
+                )
+            )
+
         # Subtitle files, optional
         if subtitle_srt_file_fullname is not None:
             attachments.append(
                 (
-                subtitle_srt_file_fullname,
-                f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.srt"
+                    subtitle_srt_file_fullname,
+                    f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.srt"
                 )
             )
 
         if subtitle_vtt_file_fullname is not None:
             attachments.append(
                 (
-                subtitle_vtt_file_fullname,
-                f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.vtt"
+                    subtitle_vtt_file_fullname,
+                    f"{file_name}{configs['texts']['whisper']['subtitle_attachment_postfix']}.vtt"
                 )
             )
 
@@ -699,6 +790,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 transcript_conversation_turns_file_fullname,
                 subtitle_vtt_file_fullname,
                 subtitle_srt_file_fullname,
+                summary_file_fullname
             ]
 
             files_list = [f for f in files_list if f is not None]
@@ -734,6 +826,12 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
 
         mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
         subtitle_vtt_file_fullname = None
+
+        mws_helpers.safe_unlink(summary_file_fullname, "SUMMARY file")
+        summary_file_fullname = None
+
+        mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
+        sidecar_path = None
 
         # Send notification
         count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
@@ -783,6 +881,9 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         mws_helpers.safe_unlink(subtitle_srt_file_fullname, "SRT subtitle file")
         mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
 
+        mws_helpers.safe_unlink(summary_file_fullname, "SUMMARY file")
+        mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
+
     finally:
         # This is the important part:
         # one finished daemon process = remove one active-job marker.
@@ -799,10 +900,8 @@ def main():
     # Infinite Loop
     while 1 < 2:
         seconds = 10
-
         # Count active jobs by .job marker files only
         count_files_in_proggress, _ = mws_helpers.count_processing_jobs()
-
         if count_files_in_proggress < configs['features']['max_files_processed_simultaneously']:
             # List unprocessed files
             count_unprocessed, unprocessed_files = mws_helpers.count_and_list_files(
