@@ -327,6 +327,11 @@ def main():
                 subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
                 # Summary Setting
                 summary_setting = "1" if summary_setting == texts_from_config_file['yes'] else "0"
+                summary_language_code = None
+                for code, name in mws_helpers.get_whisper_language_codes().items():
+                    if name == summary_language_name.lower():
+                        summary_language_code = code
+                summary_language_setting = mws_helpers.get_language_setting_index_or_code(summary_language_code)
                 # Obtain transcription model code
                 transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
                 # Combine file name from compenents
@@ -440,6 +445,8 @@ def main():
                     f"Diarization Status: {diarization_setting}\n"
                     f"Translation Status: {translation_setting}\n"
                     f"Subtitles Status: {subtitle_setting}\n"
+                    f"Summary Status: {summary_setting}\n"
+                    f"Summary Language Code: {mws_helpers.get_language_setting_index_or_code(summary_language_setting)}\n"
                     f"Files Waiting: {count_unprocessed}\n"
                     f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
                 )

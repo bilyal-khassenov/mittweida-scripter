@@ -232,20 +232,22 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
         subtitle_vtt_file = None
 
         if subtitle_setting == 1:
+            # Write subtitles under the obfuscated stem, like the Word documents, so that the
+            # clarified name (which contains the uploader's email address) never lands on disk
             srt_writer = get_writer("srt", dir_processed)
-            srt_writer(result, structured_filename)
+            srt_writer(result, str(obfuscated_standardized_fullpath))
 
             vtt_writer = get_writer("vtt", dir_processed)
-            vtt_writer(result, structured_filename)
+            vtt_writer(result, str(obfuscated_standardized_fullpath))
 
             subtitle_srt_file = os.path.join(
                 dir_processed,
-                pathlib.Path(structured_filename).stem + ".srt"
+                obfuscated_stem + ".srt"
             )
 
             subtitle_vtt_file = os.path.join(
                 dir_processed,
-                pathlib.Path(structured_filename).stem + ".vtt"
+                obfuscated_stem + ".vtt"
             )
 
         # Prepare full name and create document
@@ -261,11 +263,18 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
         # Create summary if requested
         summary_file = None
         if summary_setting == 1:
+            # Fall back to defaults if the sidecar is missing, so a finished transcription
+            # is never lost just because the optional summary options could not be read
+            sidecar = {}
             if sidecar_path.exists():
                 with open(sidecar_path, 'r', encoding='utf-8') as f:
                     sidecar = json.load(f)
-            prompt_hint = sidecar.get("prompt_hint", "")
-            summary_language = sidecar.get("summary_language", "")
+            else:
+                logger.warning(f"Sidecar file not found, summarizing with default options: {sidecar_path}")
+
+            prompt_hint = sidecar.get("prompt_hint") or ""
+            summary_language = (sidecar.get("summary_language") or
+                                configs['texts']['page']['summary_language_code_selectbox_default_option'])
             logger.debug("Creating Summary...")
             summary_file = summarize_file(result["text"], transcript_text_only_file_fullname, prompt_hint,
                                           summary_language)
@@ -691,9 +700,26 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
 
         # Prepare message
         if transcript_conversation_turns_file_fullname is not None:
-            email_text = configs['texts']['whisper']['email_text_two_files']
+            email_text_key_parts = ['email_text_two_files']
         else:
-            email_text = configs['texts']['whisper']['email_text_one_file']
+            email_text_key_parts = ['email_text_one_file']
+
+        if subtitle_srt_file_fullname is not None or subtitle_vtt_file_fullname is not None:
+            email_text_key_parts.append('subtitles')
+
+        if summary_file_fullname is not None:
+            email_text_key_parts.append('summary')
+
+        email_text_key = '_'.join(email_text_key_parts)
+
+        # Fall back to the base text if the config file does not know the key yet
+        if email_text_key not in configs['texts']['whisper']:
+            logger.warning(f"Missing email text '{email_text_key}' in config, using fallback")
+
+        email_text = configs['texts']['whisper'].get(
+            email_text_key,
+            configs['texts']['whisper'][email_text_key_parts[0]]
+        )
 
         # Extract Email Address and File Name from Base Name
         clarified_stem = mws_helpers.clarify_string(obfuscated_filename_stem)
