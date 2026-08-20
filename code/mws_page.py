@@ -434,6 +434,9 @@ def main():
                     else "unknown"
                 )
 
+                if summary_setting == "0":
+                    summary_language_setting = -1
+
                 mws_helpers.send_telegram_message(
                     configs['telegram']['admin_chat_id'],
                     f"NEW FILE HAS BEEN UPLOADED\n"
