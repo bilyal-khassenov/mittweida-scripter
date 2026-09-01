@@ -232,8 +232,8 @@ def main():
         # Create two columns for Language & Translation Settings
         language_column, model_column, diarization_column, subtitle_column, translation_column = st.columns(
             [1, 1, 1, 1, 1])  # Adjust width ratios if needed
-        # Create two columns for subtitles & summary generation
-        summary_column, summary_language, _, _, _ = st.columns([1, 1, 1, 1, 1])
+        # # # # Create two columns for subtitles & summary generation
+        # # # summary_column, summary_language, _, _, _ = st.columns([1, 1, 1, 1, 1])
         #Placeholder for Summarization Area
         summary_languages = [texts_from_config_file['summary_language_code_selectbox_default_option']] + sorted(
             [lang.title() for lang in mws_helpers.get_whisper_language_codes().values()])
@@ -257,27 +257,43 @@ def main():
         # Translation Selection Area
         with translation_column:
             translation_setting = st.selectbox(texts_from_config_file['tranlation_selection_label'], [texts_from_config_file['no'], texts_from_config_file['yes']])
-        # Summary Setting Area
-        with summary_column:
+        # Summary settings + LLM hint
+        summary_settings_column, summary_hint_column = st.columns(
+            [2, 4],
+            gap="medium"
+        )
+        with summary_settings_column:
             summary_setting = st.selectbox(
                 texts_from_config_file['summary_selectbox_label'],
-                options=[texts_from_config_file['no'], texts_from_config_file['yes']],
-                disabled=any([st.session_state.disabled, data_protection_agreed != True])
+                options=[
+                    texts_from_config_file['no'],
+                    texts_from_config_file['yes']
+                ],
+                disabled=any([
+                    st.session_state.disabled,
+                    data_protection_agreed != True
+                ])
             )
-        with summary_language:
+
             summary_language_name = st.selectbox(
                 texts_from_config_file['summary_language_selectbox_label'],
                 options=summary_languages,
-                disabled=any([st.session_state.disabled, data_protection_agreed != True])
+                disabled=any([
+                    st.session_state.disabled,
+                    data_protection_agreed != True
+                ])
             )
-
-        prompt_hint = st.text_area(
-            "Hinweise zur Zusammenfassung (optional)",
-            placeholder="Fachbegriffe, Sprechernamen...",
-            disabled=any([st.session_state.disabled, data_protection_agreed != True]),
-            max_chars=500
-        )
-
+        with summary_hint_column:
+            prompt_hint = st.text_area(
+                "Hinweise zur Zusammenfassung (optional)",
+                placeholder="Fachbegriffe, Sprechernamen...",
+                disabled=any([
+                    st.session_state.disabled,
+                    data_protection_agreed != True
+                ]),
+                max_chars=500,
+                height=160
+            )
         # Upload section
         uploaded_file = st.file_uploader(
             label=texts_from_config_file['select_file'],
