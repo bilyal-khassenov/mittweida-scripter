@@ -1,5 +1,5 @@
 # Import main packages
-import pathlib, os, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback, json, tiktoken
+import pathlib, os, re, sys, time, datetime, shutil, torch, pandas, whisper, getpass, traceback, json, tiktoken
 import ffmpeg
 from mutagen.oggopus import OggOpus
 from docx.enum.text import WD_COLOR_INDEX
@@ -26,6 +26,11 @@ dir_orig_files_temps = mws_helpers.ProjectPaths().temp_orig_file_path
 path_to_perf_protocol = mws_helpers.ProjectPaths().performance_protocol_fullfilename
 configs = mws_helpers.get_configs()
 enc = tiktoken.get_encoding("cl100k_base")
+
+# Input budget per LLM call: leave headroom in the context window for the system
+# prompt and the generated summary, and absorb the tokenizer mismatch between
+# tiktoken (used for counting) and the actual model tokenizer
+llm_input_token_budget = configs['llm']['num_ctx'] - 8192
 
 #create logger
 logger = mws_helpers.create_logger(__name__)
@@ -100,77 +105,171 @@ def word_count(text):
     return len(text.split())
 
 
-def chunk_text_tokens(text, max_tokens=2000):
-    tokens = enc.encode(text)
-    chunks = []
-    for i in range(0, len(tokens), max_tokens):
-        chunk_tokens = tokens[i:i + max_tokens]
-        chunks.append(enc.decode(chunk_tokens))
-    return chunks
+def format_timestamp(seconds):
+    return time.strftime('%H:%M:%S', time.gmtime(seconds))
 
 
-def summarize_chunk(text, prompt_hint, summary_language, compression=0.2):
-    maximum_words = max(150, int(compression * word_count(text)))
-    logger.debug("Anzahl der Wörter: ")
-    logger.debug(maximum_words)
+def format_segments_for_llm(segments):
+    return [segment['text'].strip() for segment in segments if segment['text'].strip()]
 
-    prompt = configs['texts']['whisper']['summary_prompt'].format(
-        maximum_words=maximum_words,
+
+def format_conversation_turns_for_llm(conversation_turns):
+    return [
+        f"[{format_timestamp(conversation_turn['start'])}] "
+        f"{conversation_turn['speaker']}: {conversation_turn['text'].strip()}"
+        for conversation_turn in conversation_turns
+    ]
+
+
+def group_texts_by_tokens(texts, max_tokens):
+    groups = []
+    current_group = []
+    current_tokens = 0
+    for text in texts:
+        # Count the joining newline as well, so joined groups stay within the budget
+        text_tokens = len(enc.encode(text + "\n"))
+        if current_group and current_tokens + text_tokens > max_tokens:
+            groups.append(current_group)
+            current_group = []
+            current_tokens = 0
+        current_group.append(text)
+        current_tokens += text_tokens
+    if current_group:
+        groups.append(current_group)
+    return groups
+
+
+def chunk_lines_by_tokens(lines, max_tokens):
+    return ["\n".join(group) for group in group_texts_by_tokens(lines, max_tokens)]
+
+
+def clean_llm_output(text):
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = text.replace('**', '')
+    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*\*\s+', '- ', text, flags=re.MULTILINE)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, prompt_template):
+    logger.debug(f"Summarizing chunk with target length {min_words}-{max_words} words")
+
+    prompt = prompt_template.format(
+        min_words=min_words,
+        max_words=max_words,
         summary_language=summary_language
     )
 
     system_prompt = prompt + prompt_hint
 
+    options = {
+        "num_ctx": configs['llm']['num_ctx'],
+        "temperature": configs['llm']['temperature'],
+        "num_predict": min(8192, max(768, int(max_words * 3)))
+    }
+
     response = chat(
-        model='gemma4:e4b',
+        model=configs['llm']['model'],
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
-        ]
+        ],
+        options=options
     )
+    summary_text = response['message']['content']
 
-    return response['message']['content']
+    # The model occasionally returns an empty answer; one retry with a higher
+    # temperature usually breaks that degenerate state
+    if not summary_text.strip():
+        logger.warning("LLM returned an empty summary, retrying once with higher temperature")
+        retry_options = dict(options, temperature=min(1.0, configs['llm']['temperature'] + 0.5))
+        response = chat(
+            model=configs['llm']['model'],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            options=retry_options
+        )
+        summary_text = response['message']['content']
+
+    # The model tends to undershoot the requested length; ask it once to expand
+    # its own draft when the result stays below the minimum
+    current_words = word_count(summary_text)
+    if summary_text.strip() and current_words < min_words:
+        logger.debug(f"Summary too short ({current_words} < {min_words} words), asking the model to expand it")
+        response = chat(
+            model=configs['llm']['model'],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": summary_text},
+                {"role": "user", "content": (
+                    f"Your summary has only {current_words} words. Expand it to at least "
+                    f"{min_words} words by adding more detail from the transcript. Keep the "
+                    f"same style and rules. Output only the expanded summary."
+                )}
+            ],
+            options=options
+        )
+        expanded_text = response['message']['content']
+        if word_count(expanded_text) > current_words:
+            summary_text = expanded_text
+
+    return summary_text
 
 
-def hierarchical_reduce(texts, prompt_hint, summary_language, group_size=5, compression=0.3, max_workers=4):
+def hierarchical_reduce(texts, prompt_hint, summary_language, min_words, max_words, prompt_template, max_workers=4):
     while len(texts) > 1:
-        groups = [texts[i:i + group_size] for i in range(0, len(texts), group_size)]
+        groups = group_texts_by_tokens(texts, llm_input_token_budget)
+        final_round = len(groups) == 1
 
-        tasks = []
         new_texts = [None] * len(groups)
-        for idx, group in enumerate(groups):
-            if len(group) == 1:
-                new_texts[idx] = group[0]
-            else:
-                tasks.append((idx, " ".join(group)))
-
-        if tasks:
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(summarize_chunk, text, prompt_hint, summary_language, compression): idx
-                    for idx, text in tasks
-                }
-                for future in futures:
-                    idx = futures[future]
-                    new_texts[idx] = future.result()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {}
+            for idx, group in enumerate(groups):
+                group_text = "\n".join(group)
+                if final_round:
+                    group_min_words, group_max_words = min_words, max_words
+                else:
+                    group_target_words = min(800, max(250, int(0.25 * word_count(group_text))))
+                    group_min_words = int(group_target_words * 0.8)
+                    group_max_words = int(group_target_words * 1.2)
+                futures[executor.submit(
+                    summarize_chunk, group_text, prompt_hint, summary_language,
+                    group_min_words, group_max_words, prompt_template
+                )] = idx
+            for future in futures:
+                new_texts[futures[future]] = future.result()
 
         texts = new_texts
 
     return texts[0]
 
 
-def summarize_file(input_data, original_file_path, prompt_hint, summary_language):
-    chunks = chunk_text_tokens(input_data, max_tokens=2000)
-    logger.debug(f"Chunks: {len(chunks)}")
+def summarize_file(lines, plain_text, obfuscated_stem, prompt_hint, summary_language,
+                   prompt_template, docx_title, filename_postfix):
+    total_words = word_count(plain_text)
+    target_words = min(1500, max(150, int(0.2 * total_words)))
+    min_words = int(target_words * 0.8)
+    max_words = int(target_words * 1.2)
+
+    chunks = chunk_lines_by_tokens(lines, llm_input_token_budget)
+    logger.debug(f"Chunks: {len(chunks)}, target summary length: {min_words}-{max_words} words")
 
     if len(chunks) == 1:
-        final_text = summarize_chunk(chunks[0], prompt_hint, summary_language, compression=0.3)
+        final_text = summarize_chunk(chunks[0], prompt_hint, summary_language,
+                                     min_words, max_words, prompt_template)
     else:
-        final_text = hierarchical_reduce(chunks, prompt_hint, summary_language, group_size=5, compression=0.3)
-    new_file_name_stem = pathlib.Path(original_file_path).stem
-    summary_path = os.path.join(dir_processed, new_file_name_stem + "_summary.docx")
+        final_text = hierarchical_reduce(chunks, prompt_hint, summary_language,
+                                         min_words, max_words, prompt_template) 
+
+    final_text = clean_llm_output(final_text)
+
+    summary_path = os.path.join(dir_processed, obfuscated_stem + filename_postfix + ".docx")
     document = Document()
-    document.add_heading("Zusammenfassung", 0)
+    document.add_heading(docx_title, 0)
     document.add_paragraph(final_text)
     document.save(summary_path)
     return summary_path
@@ -260,25 +359,6 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
             + '.docx'
         )
 
-        # Create summary if requested
-        summary_file = None
-        if summary_setting == 1:
-            # Fall back to defaults if the sidecar is missing, so a finished transcription
-            # is never lost just because the optional summary options could not be read
-            sidecar = {}
-            if sidecar_path.exists():
-                with open(sidecar_path, 'r', encoding='utf-8') as f:
-                    sidecar = json.load(f)
-            else:
-                logger.warning(f"Sidecar file not found, summarizing with default options: {sidecar_path}")
-
-            prompt_hint = sidecar.get("prompt_hint") or ""
-            summary_language = (sidecar.get("summary_language") or
-                                configs['texts']['page']['summary_language_code_selectbox_default_option'])
-            logger.debug("Creating Summary...")
-            summary_file = summarize_file(result["text"], transcript_text_only_file_fullname, prompt_hint,
-                                          summary_language)
-
         document_text_only = Document()
 
         # Change Docx Settings
@@ -344,6 +424,7 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
         document_text_only.save(transcript_text_only_file_fullname)
 
         # Perform diarization conditionally
+        completed_conversation_turns = None
         if diarization_setting == 1:
             # Pyannote/torchaudio can be more reliable with WAV than Opus.
             # So we create a temporary WAV only for diarization.
@@ -502,6 +583,48 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
         else:
             transcript_conversation_turns_file_fullname = None
 
+        # Create summaries if requested
+        summary_file = None
+        conversation_summary_file = None
+        if summary_setting == 1:
+            # Fall back to defaults if the sidecar is missing, so a finished transcription
+            # is never lost just because the optional summary options could not be read
+            sidecar = {}
+            if sidecar_path.exists():
+                with open(sidecar_path, 'r', encoding='utf-8') as f:
+                    sidecar = json.load(f)
+            else:
+                logger.warning(f"Sidecar file not found, summarizing with default options: {sidecar_path}")
+
+            prompt_hint = sidecar.get("prompt_hint") or ""
+            summary_language = (sidecar.get("summary_language") or
+                                configs['texts']['page']['summary_language_code_selectbox_default_option'])
+
+            logger.debug("Creating Summary...")
+            summary_file = summarize_file(
+                format_segments_for_llm(result["segments"]),
+                result["text"],
+                obfuscated_stem,
+                prompt_hint,
+                summary_language,
+                configs['texts']['whisper']['summary_prompt'],
+                configs['texts']['whisper']['docx_summary_title'],
+                configs['texts']['whisper']['summary_attachment_postfix']
+            )
+
+            if completed_conversation_turns is not None:
+                logger.debug("Creating Conversation Summary...")
+                conversation_summary_file = summarize_file(
+                    format_conversation_turns_for_llm(completed_conversation_turns),
+                    result["text"],
+                    obfuscated_stem,
+                    prompt_hint,
+                    summary_language,
+                    configs['texts']['whisper']['conversation_summary_prompt'],
+                    configs['texts']['whisper']['docx_conversation_summary_title'],
+                    configs['texts']['whisper']['conversation_summary_attachment_postfix']
+                )
+
         # Delete the standardized Opus file after transcription is complete
         mws_helpers.safe_unlink(obfuscated_standardized_fullpath, "standardized Opus file")
 
@@ -552,7 +675,8 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
             file_size,
             subtitle_vtt_file,
             subtitle_srt_file,
-            summary_file
+            summary_file,
+            conversation_summary_file
         ]
 
     except Exception:
@@ -603,6 +727,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
     subtitle_vtt_file_fullname = None
     subtitle_srt_file_fullname = None
     summary_file_fullname = None
+    conversation_summary_file_fullname = None
 
     try:
         # Prepare fullpath for conversion folder
@@ -680,6 +805,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         subtitle_vtt_file_fullname = transcription_result_paths[4]
         subtitle_srt_file_fullname = transcription_result_paths[5]
         summary_file_fullname = transcription_result_paths[6]
+        conversation_summary_file_fullname = transcription_result_paths[7]
 
         # transcribe_file deletes the standardized Opus file after successful transcription
         obfuscated_standardized_fullpath = None
@@ -762,6 +888,15 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 )
             )
 
+        # Conversation summary, optional
+        if conversation_summary_file_fullname is not None:
+            attachments.append(
+                (
+                    conversation_summary_file_fullname,
+                    f"{file_name}{configs['texts']['whisper']['conversation_summary_attachment_postfix']}.docx"
+                )
+            )
+
         # Subtitle files, optional
         if subtitle_srt_file_fullname is not None:
             attachments.append(
@@ -816,7 +951,8 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
                 transcript_conversation_turns_file_fullname,
                 subtitle_vtt_file_fullname,
                 subtitle_srt_file_fullname,
-                summary_file_fullname
+                summary_file_fullname,
+                conversation_summary_file_fullname
             ]
 
             files_list = [f for f in files_list if f is not None]
@@ -855,6 +991,9 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
 
         mws_helpers.safe_unlink(summary_file_fullname, "SUMMARY file")
         summary_file_fullname = None
+
+        mws_helpers.safe_unlink(conversation_summary_file_fullname, "CONVERSATION SUMMARY file")
+        conversation_summary_file_fullname = None
 
         mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
         sidecar_path = None
@@ -908,6 +1047,7 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         mws_helpers.safe_unlink(subtitle_vtt_file_fullname, "VTT subtitle file")
 
         mws_helpers.safe_unlink(summary_file_fullname, "SUMMARY file")
+        mws_helpers.safe_unlink(conversation_summary_file_fullname, "CONVERSATION SUMMARY file")
         mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
 
     finally:

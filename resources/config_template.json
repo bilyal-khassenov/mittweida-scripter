@@ -22,6 +22,11 @@
         "average_confidence_level_lower_bound": -0.6,
         "max_files_processed_simultaneously": 4
     },
+    "llm": {
+        "model": "gemma4:e4b",
+        "num_ctx": 32768,
+        "temperature": 0.2
+    },
     "encryption": {
         "key": "YOUR_BASE64_KEY_HERE_OR_IN_ENV_VARIABLE"
     },
@@ -88,17 +93,21 @@
             "email_text_one_file_subtitles": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- Untertitel im SRT- und VTT-Format\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_text_two_files_subtitles": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln\n- Untertitel im SRT- und VTT-Format\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_text_one_file_summary": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- eine Zusammenfassung des Inhalts\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
-            "email_text_two_files_summary": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln\n- eine Zusammenfassung des Inhalts\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
+            "email_text_two_files_summary": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln\n- eine Zusammenfassung des Inhalts\n- eine Zusammenfassung des Gesprächsverlaufs mit Sprecher:innen-Zuordnung\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_text_one_file_subtitles_summary": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- Untertitel im SRT- und VTT-Format\n- eine Zusammenfassung des Inhalts\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
-            "email_text_two_files_subtitles_summary": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln\n- Untertitel im SRT- und VTT-Format\n- eine Zusammenfassung des Inhalts\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
+            "email_text_two_files_subtitles_summary": "Sehr geehrte Damen und Herren,\n\ndie Transkription der von Ihnen hochgeladenen Datei wurde erfolgreich abgeschlossen. Im Anhang dieser E-Mail finden Sie:\n\n- den transkribierten Text\n- den transkribierten Text mit Zuordnung der Sprecher:innen und Zeitstempeln\n- Untertitel im SRT- und VTT-Format\n- eine Zusammenfassung des Inhalts\n- eine Zusammenfassung des Gesprächsverlaufs mit Sprecher:innen-Zuordnung\n\nViel Erfolg bei Ihrer weiteren Arbeit!\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_text_error": "Sehr geehrte Damen und Herren, \n\nleider ist bei der Transkription der von Ihnen hochgeladenen Datei ein Fehler aufgetreten.\n\nSie können uns auch die Datei direkt zukommen lassen und wir schauen uns das Problem genauer an.\n\nMit freundlichen Grüßen\n\nMittweida Scripter",
             "email_subject": "Transkription",
             "email_subject_error": "Transkription fehlgeschlagen",
             "text_only_attachment_postfix": "_text_only",
             "conversation_turns_attachment_postfix": "_conversation_turns",
             "summary_attachment_postfix": "_summary",
+            "conversation_summary_attachment_postfix": "_conversation_summary",
             "subtitle_attachment_postfix": "_subtitles",
-            "summary_prompt": "Your goal is to summarize the given text in maximum {maximum_words} words. Extract only the most important information. Only output the summary without any additional text. Answer in {summary_language} only. "
+            "docx_summary_title": "Zusammenfassung",
+            "docx_conversation_summary_title": "Zusammenfassung des Gesprächsverlaufs",
+            "summary_prompt": "You are given a transcript. Write a detailed summary of the transcript in {min_words} to {max_words} words — do not stop before reaching {min_words} words. Extract the most important information and keep the overall structure of the content. Write plain text without any Markdown formatting (no **, no # headings). Only output the summary itself without any introduction or additional text. Answer in {summary_language} only. ",
+            "conversation_summary_prompt": "You are given a transcript of a conversation. Each turn starts with a timestamp and a speaker label in the form [HH:MM:SS] SPEAKER_00:. Write a summary of the conversation in {min_words} to {max_words} words — do not stop before reaching {min_words} words — that focuses on who said what: describe each speaker's main points, positions, questions, and decisions, referring to speakers by their labels (e.g. SPEAKER_00). Cite timestamps in the form [HH:MM:SS] when referencing specific statements. Write plain text without any Markdown formatting. Only output the summary itself without any introduction or additional text. Answer in {summary_language} only. "
         }
     }
   }
