@@ -186,7 +186,8 @@ def send_telegram_message(admin_recipients, message_string: str):
 
         if not response.ok:
             print(f"Telegram message failed: {response.status_code} - {response.text}")
-    
+
+
 def get_css_opacity_style_code(style: Literal['grey', 'normal']):
     if style == 'grey':
         grey_style = """<style>
@@ -257,6 +258,7 @@ def clarify_string(token: str) -> str:
     cipher = Cipher(algorithms.AES(key), modes.CTR(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     return (decryptor.update(ct) + decryptor.finalize()).decode()
+
 
 def safe_unlink(file_path, label="file"):
     """
@@ -397,10 +399,11 @@ def get_media_info(path):
         'size_bytes': size_bytes
     }
 
+
 def create_logger(loger_name: str):
     pathlib.Path("../logs/").mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(loger_name)
-    logger.setLevel(logging.WARNING)
+    logger.setLevel(logging.DEBUG)
 
     if logger.handlers:
         return logger
@@ -412,9 +415,11 @@ def create_logger(loger_name: str):
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     file_handler = RotatingFileHandler('../logs/' + loger_name + '.log', maxBytes=100_000, backupCount=5)
+    file_handler.setLevel(logging.WARNING)
     file_handler.namer = namer
 
     console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
