@@ -144,12 +144,21 @@ def chunk_lines_by_tokens(lines, max_tokens):
 
 
 def clean_llm_output(text):
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = text.replace('**', '')
     text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'^\s*\*\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
+
+
+def add_bold_markdown_paragraph(document, text):
+    # re.split with a capture group alternates plain text (even) and **bold** text (odd)
+    paragraph = document.add_paragraph()
+    for i, part in enumerate(re.split(r'\*\*(.+?)\*\*', text)):
+        if not part:
+            continue
+        run = paragraph.add_run(part if i % 2 else part.replace('**', ''))
+        run.bold = bool(i % 2)
+    return paragraph
 
 
 def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, prompt_template):
@@ -251,7 +260,9 @@ def hierarchical_reduce(texts, prompt_hint, summary_language, min_words, max_wor
 def summarize_file(lines, plain_text, obfuscated_stem, prompt_hint, summary_language,
                    prompt_template, docx_title, filename_postfix):
     total_words = word_count(plain_text)
-    target_words = min(1500, max(150, int(0.2 * total_words)))
+    target_words = min(configs['llm']['summary_max_words'],
+                       max(configs['llm']['summary_min_words'],
+                           int(configs['llm']['summary_ratio'] * total_words)))
     min_words = int(target_words * 0.8)
     max_words = int(target_words * 1.2)
 
@@ -270,7 +281,7 @@ def summarize_file(lines, plain_text, obfuscated_stem, prompt_hint, summary_lang
     summary_path = os.path.join(dir_processed, obfuscated_stem + filename_postfix + ".docx")
     document = Document()
     document.add_heading(docx_title, 0)
-    document.add_paragraph(final_text)
+    add_bold_markdown_paragraph(document, final_text)
     document.save(summary_path)
     return summary_path
 
