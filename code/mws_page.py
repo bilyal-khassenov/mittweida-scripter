@@ -284,7 +284,7 @@ def main():
                 ])
             )
         with summary_hint_column:
-            prompt_hint = st.text_area(
+            additional_info = st.text_area(
                 "Hinweise zur Zusammenfassung (optional)",
                 placeholder="Fachbegriffe, Sprechernamen...",
                 disabled=any([
@@ -373,7 +373,7 @@ def main():
 
                 sidecar_path = obfuscated_file_fullpath_orig_postfix.with_suffix('.json')
                 sidecar_data = {
-                    "prompt_hint": prompt_hint,
+                    "additional_info": additional_info,
                     "summary_language": summary_language_name
                 }
                 with open(sidecar_path, 'w', encoding='utf-8') as f:

@@ -161,16 +161,14 @@ def add_bold_markdown_paragraph(document, text):
     return paragraph
 
 
-def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, prompt_template):
+def summarize_chunk(text, additional_info, summary_language, min_words, max_words, prompt_template):
     logger.debug(f"Summarizing chunk with target length {min_words}-{max_words} words")
 
-    prompt = prompt_template.format(
+    system_prompt = prompt_template.format(
         min_words=min_words,
         max_words=max_words,
         summary_language=summary_language
     )
-
-    system_prompt = prompt + prompt_hint
 
     options = {
         "num_ctx": configs['llm']['num_ctx'],
@@ -182,6 +180,7 @@ def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, p
         model=configs['llm']['model'],
         messages=[
             {"role": "system", "content": system_prompt},
+            {"role": "system", "content": additional_info},
             {"role": "user", "content": text}
         ],
         options=options
@@ -197,6 +196,7 @@ def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, p
             model=configs['llm']['model'],
             messages=[
                 {"role": "system", "content": system_prompt},
+                {"role": "system", "content": additional_info},
                 {"role": "user", "content": text}
             ],
             options=retry_options
@@ -212,6 +212,7 @@ def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, p
             model=configs['llm']['model'],
             messages=[
                 {"role": "system", "content": system_prompt},
+                {"role": "system", "content": additional_info},
                 {"role": "user", "content": text},
                 {"role": "assistant", "content": summary_text},
                 {"role": "user", "content": (
@@ -229,7 +230,7 @@ def summarize_chunk(text, prompt_hint, summary_language, min_words, max_words, p
     return summary_text
 
 
-def hierarchical_reduce(texts, prompt_hint, summary_language, min_words, max_words, prompt_template, max_workers=4):
+def hierarchical_reduce(texts, additional_info, summary_language, min_words, max_words, prompt_template, max_workers=4):
     while len(texts) > 1:
         groups = group_texts_by_tokens(texts, llm_input_token_budget)
         final_round = len(groups) == 1
@@ -246,7 +247,7 @@ def hierarchical_reduce(texts, prompt_hint, summary_language, min_words, max_wor
                     group_min_words = int(group_target_words * 0.8)
                     group_max_words = int(group_target_words * 1.2)
                 futures[executor.submit(
-                    summarize_chunk, group_text, prompt_hint, summary_language,
+                    summarize_chunk, group_text, additional_info, summary_language,
                     group_min_words, group_max_words, prompt_template
                 )] = idx
             for future in futures:
@@ -257,7 +258,7 @@ def hierarchical_reduce(texts, prompt_hint, summary_language, min_words, max_wor
     return texts[0]
 
 
-def summarize_file(lines, plain_text, obfuscated_stem, prompt_hint, summary_language,
+def summarize_file(lines, plain_text, obfuscated_stem, additional_info, summary_language,
                    prompt_template, docx_title, filename_postfix):
     total_words = word_count(plain_text)
     target_words = min(configs['llm']['summary_max_words'],
@@ -270,10 +271,10 @@ def summarize_file(lines, plain_text, obfuscated_stem, prompt_hint, summary_lang
     logger.debug(f"Chunks: {len(chunks)}, target summary length: {min_words}-{max_words} words")
 
     if len(chunks) == 1:
-        final_text = summarize_chunk(chunks[0], prompt_hint, summary_language,
+        final_text = summarize_chunk(chunks[0], additional_info, summary_language,
                                      min_words, max_words, prompt_template)
     else:
-        final_text = hierarchical_reduce(chunks, prompt_hint, summary_language,
+        final_text = hierarchical_reduce(chunks, additional_info, summary_language,
                                          min_words, max_words, prompt_template) 
 
     final_text = clean_llm_output(final_text)
@@ -607,7 +608,7 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
             else:
                 logger.warning(f"Sidecar file not found, summarizing with default options: {sidecar_path}")
 
-            prompt_hint = sidecar.get("prompt_hint") or ""
+            additional_info = sidecar.get("additional_info") or ""
             summary_language = (sidecar.get("summary_language") or
                                 configs['texts']['page']['summary_language_code_selectbox_default_option'])
 
@@ -616,7 +617,7 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
                 format_segments_for_llm(result["segments"]),
                 result["text"],
                 obfuscated_stem,
-                prompt_hint,
+                additional_info,
                 summary_language,
                 configs['texts']['whisper']['summary_prompt'],
                 configs['texts']['whisper']['docx_summary_title'],
@@ -629,7 +630,7 @@ def transcribe_file(obfuscated_standardized_fullpath, sidecar_path):
                     format_conversation_turns_for_llm(completed_conversation_turns),
                     result["text"],
                     obfuscated_stem,
-                    prompt_hint,
+                    additional_info,
                     summary_language,
                     configs['texts']['whisper']['conversation_summary_prompt'],
                     configs['texts']['whisper']['docx_conversation_summary_title'],
