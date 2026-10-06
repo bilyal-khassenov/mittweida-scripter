@@ -183,6 +183,27 @@ def maintenance_dialog(date):
             st.session_state.maintenance = False
             st.rerun()
 
+def get_authenticated_email():
+    header_name = configs['header_names'].get('user_email')
+
+    if not header_name:
+        return ""
+
+    return st.context.headers.get(header_name, "").strip().lower()
+
+def is_shadow_banned(email):
+    if not configs.get('security', {}).get('use_shadow_ban', False):
+        return False
+
+    banned_emails = {
+        address.strip().lower()
+        for address in configs.get('security', {}).get(
+            'shadow_banned_emails',
+            []
+        )
+    }
+
+    return email.strip().lower() in banned_emails
 
 def main():
     # To test locally:
@@ -308,169 +329,187 @@ def main():
 
     # Action on submitting
     if submit_button:
+        authenticated_email = get_authenticated_email()
         if email_address_textbox == '':
             st.error(texts_from_config_file['error_username_not_provided'], icon="🚨")
         elif uploaded_file is None:
             st.error(texts_from_config_file['error_file_not_selected'], icon="🚨")
         elif re.compile(r'^\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b$').search(
                 email_address_textbox):  # If it is a valid e-mail address
-            with st.spinner(texts_from_config_file['uploading_file_process_spinner_label']):  # Show spinner
-                # Transliterate input file name
-                p = pathlib.Path(uploaded_file.name)
-                userdefined_file_name_stem = unidecode(p.stem)
-                file_extension_of_originally_uploaded_file = p.suffix.lower()
+            
+            # Shadow-ban check
+            shadow_banned = (
+                authenticated_email
+                and is_shadow_banned(authenticated_email)
+            )
 
-                # Sanitize Filename
-                userdefined_file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", userdefined_file_name_stem)
-                # Replace spaces with undescore charachter
-                re_pattern_space_char = r'[^\w_.-]'
-                userdefined_file_name_stem = re.sub(re_pattern_space_char, '_', userdefined_file_name_stem)
-                # Replace consecutive non-alphanumeric characters with a single underscore
-                userdefined_file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', userdefined_file_name_stem)
-                # Remove leading and trailing underscores
-                userdefined_file_name_stem = userdefined_file_name_stem.strip('_')
-                # Obtain Language Code
-                language_code = None
-                for code, name in mws_helpers.get_whisper_language_codes().items():
-                    if name == language_name.lower():
-                        language_code = code
-                language_setting = mws_helpers.get_language_setting_index_or_code(language_code)
-                # Obtain Translation Status
-                translation_setting = "1" if translation_setting == texts_from_config_file['yes'] else "0"
-                # Obtain Diarizatin Setting
-                diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
-                # Subtitle Setting
-                subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
-                # Summary Setting
-                summary_setting = "1" if summary_setting == texts_from_config_file['yes'] else "0"
-                summary_language_code = None
-                for code, name in mws_helpers.get_whisper_language_codes().items():
-                    if name == summary_language_name.lower():
-                        summary_language_code = code
-                summary_language_setting = mws_helpers.get_language_setting_index_or_code(summary_language_code)
-                # Obtain transcription model code
-                transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
-                # Combine file name from compenents
-                plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{subtitle_setting}#{summary_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[
-                    0:120]
-                plain_structured_original_file_name = plain_structured_original_file_name_stem + file_extension_of_originally_uploaded_file
-                # Obfuscated
-                obfuscated_filename_stem = mws_helpers.obfuscate_string(plain_structured_original_file_name_stem)
-                # Prepare paths
-                file_extension_of_originally_uploaded_file = pathlib.Path(dir_orig_files_temps,
-                                                                          uploaded_file.name).suffix
-                # obfuscated_original_file_fullpath = pathlib.Path(dir_orig_files_temps, obfuscated_original_file_name_stem + format_suffix_of_user_uploaded_file)
-                # obfuscated_encrypted_file_fullpath_enc_postfix = pathlib.Path(dir_orig_files_temps, obfuscated_filename_stem + ".enc")
-                obfuscated_file_fullpath_orig_postfix = pathlib.Path(dir_orig_files_temps,
-                                                                     obfuscated_filename_stem + file_extension_of_originally_uploaded_file)
+            if shadow_banned:
+                # Notification
+                if configs['telegram']['use_telegram'] == True:
+                    mws_helpers.send_telegram_message(
+                        configs['telegram']['admin_chat_id'],
+                        f"SHADOW BAN TRIGGERED"
+                    )
+            else:
+                
+                #Normal processing
+                with st.spinner(texts_from_config_file['uploading_file_process_spinner_label']):  # Show spinner
+                    # Transliterate input file name
+                    p = pathlib.Path(uploaded_file.name)
+                    userdefined_file_name_stem = unidecode(p.stem)
+                    file_extension_of_originally_uploaded_file = p.suffix.lower()
 
-                # Get bytes of uploaded file
-                uploaded_file_bytes = uploaded_file.getvalue()
+                    # Sanitize Filename
+                    userdefined_file_name_stem = re.sub(r'[^a-zA-Z0-9._-]', "_", userdefined_file_name_stem)
+                    # Replace spaces with undescore charachter
+                    re_pattern_space_char = r'[^\w_.-]'
+                    userdefined_file_name_stem = re.sub(re_pattern_space_char, '_', userdefined_file_name_stem)
+                    # Replace consecutive non-alphanumeric characters with a single underscore
+                    userdefined_file_name_stem = re.sub(r'[^a-zA-Z0-9]+', '_', userdefined_file_name_stem)
+                    # Remove leading and trailing underscores
+                    userdefined_file_name_stem = userdefined_file_name_stem.strip('_')
+                    # Obtain Language Code
+                    language_code = None
+                    for code, name in mws_helpers.get_whisper_language_codes().items():
+                        if name == language_name.lower():
+                            language_code = code
+                    language_setting = mws_helpers.get_language_setting_index_or_code(language_code)
+                    # Obtain Translation Status
+                    translation_setting = "1" if translation_setting == texts_from_config_file['yes'] else "0"
+                    # Obtain Diarizatin Setting
+                    diarization_setting = "1" if diarization_setting == texts_from_config_file['yes'] else "0"
+                    # Subtitle Setting
+                    subtitle_setting = "1" if subtitle_setting == texts_from_config_file['yes'] else "0"
+                    # Summary Setting
+                    summary_setting = "1" if summary_setting == texts_from_config_file['yes'] else "0"
+                    summary_language_code = None
+                    for code, name in mws_helpers.get_whisper_language_codes().items():
+                        if name == summary_language_name.lower():
+                            summary_language_code = code
+                    summary_language_setting = mws_helpers.get_language_setting_index_or_code(summary_language_code)
+                    # Obtain transcription model code
+                    transcription_model_setting = mws_helpers.get_model_setting_index_or_name(transcription_model)
+                    # Combine file name from compenents
+                    plain_structured_original_file_name_stem = f"{datetime.today().strftime('%Y%m%d#%H%M%S')}#{email_address_textbox}#{language_setting}#{translation_setting}#{diarization_setting}#{subtitle_setting}#{summary_setting}#{transcription_model_setting}#{userdefined_file_name_stem}"[
+                        0:120]
+                    plain_structured_original_file_name = plain_structured_original_file_name_stem + file_extension_of_originally_uploaded_file
+                    # Obfuscated
+                    obfuscated_filename_stem = mws_helpers.obfuscate_string(plain_structured_original_file_name_stem)
+                    # Prepare paths
+                    file_extension_of_originally_uploaded_file = pathlib.Path(dir_orig_files_temps,
+                                                                            uploaded_file.name).suffix
+                    # obfuscated_original_file_fullpath = pathlib.Path(dir_orig_files_temps, obfuscated_original_file_name_stem + format_suffix_of_user_uploaded_file)
+                    # obfuscated_encrypted_file_fullpath_enc_postfix = pathlib.Path(dir_orig_files_temps, obfuscated_filename_stem + ".enc")
+                    obfuscated_file_fullpath_orig_postfix = pathlib.Path(dir_orig_files_temps,
+                                                                        obfuscated_filename_stem + file_extension_of_originally_uploaded_file)
 
-                # Temporarily save audio file to gather info
-                with open(obfuscated_file_fullpath_orig_postfix, mode='wb') as w:
-                    w.write(uploaded_file.getvalue())
+                    # Get bytes of uploaded file
+                    uploaded_file_bytes = uploaded_file.getvalue()
 
-                sidecar_path = obfuscated_file_fullpath_orig_postfix.with_suffix('.json')
-                sidecar_data = {
-                    "additional_info": additional_info,
-                    "summary_language": summary_language_name
-                }
-                with open(sidecar_path, 'w', encoding='utf-8') as f:
-                    json.dump(sidecar_data, f, ensure_ascii=False, indent=2)
+                    # Temporarily save audio file to gather info
+                    with open(obfuscated_file_fullpath_orig_postfix, mode='wb') as w:
+                        w.write(uploaded_file.getvalue())
 
-                # Gather file info
-                media_info = mws_helpers.get_media_info(obfuscated_file_fullpath_orig_postfix)
-                duration_seconds = media_info['duration_seconds']
-                file_size = media_info['size_bytes']
-                # Delete temporary file
-                pathlib.Path.unlink(obfuscated_file_fullpath_orig_postfix)
+                    sidecar_path = obfuscated_file_fullpath_orig_postfix.with_suffix('.json')
+                    sidecar_data = {
+                        "additional_info": additional_info,
+                        "summary_language": summary_language_name
+                    }
+                    with open(sidecar_path, 'w', encoding='utf-8') as f:
+                        json.dump(sidecar_data, f, ensure_ascii=False, indent=2)
 
-                # Write encrypted file
-                key = mws_helpers.get_encryption_key()
-                fernet = Fernet(key)
-                encrypted_bytes = fernet.encrypt(uploaded_file_bytes)
+                    # Gather file info
+                    media_info = mws_helpers.get_media_info(obfuscated_file_fullpath_orig_postfix)
+                    duration_seconds = media_info['duration_seconds']
+                    file_size = media_info['size_bytes']
+                    # Delete temporary file
+                    pathlib.Path.unlink(obfuscated_file_fullpath_orig_postfix)
 
-                with open(obfuscated_file_fullpath_orig_postfix,
-                          "wb") as enc_file:  # this filename is used to transfer the original file extension to mws_whisper.py
-                    enc_file.write(encrypted_bytes)
+                    # Write encrypted file
+                    key = mws_helpers.get_encryption_key()
+                    fernet = Fernet(key)
+                    encrypted_bytes = fernet.encrypt(uploaded_file_bytes)
 
-                # Prepare New Protocol Record
+                    with open(obfuscated_file_fullpath_orig_postfix,
+                            "wb") as enc_file:  # this filename is used to transfer the original file extension to mws_whisper.py
+                        enc_file.write(encrypted_bytes)
+
+                    # Prepare New Protocol Record
+                    try:
+                        institution_referer = st.context.headers[configs['header_names']['identity_provider']]
+                    except:
+                        institution_referer = '--'
+                    # Prepare new protocol record
+                    new_order_record = [{'upload_timestamp': time.time(),
+                                        'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
+                                        'duration_seconds': duration_seconds,
+                                        'file_size': file_size,
+                                        'institution': institution_referer,
+                                        'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
+                                        'translation_status': translation_setting,
+                                        'diarization_status': diarization_setting,
+                                        'transcription_model': transcription_model}]
+
+                #Prepare New Protocol Record
                 try:
                     institution_referer = st.context.headers[configs['header_names']['identity_provider']]
                 except:
                     institution_referer = '--'
                 # Prepare new protocol record
                 new_order_record = [{'upload_timestamp': time.time(),
-                                     'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
-                                     'duration_seconds': duration_seconds,
-                                     'file_size': file_size,
-                                     'institution': institution_referer,
-                                     'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
-                                     'translation_status': translation_setting,
-                                     'diarization_status': diarization_setting,
-                                     'transcription_model': transcription_model}]
+                                    'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
+                                    'duration_seconds': duration_seconds,
+                                    'file_size': file_size,
+                                    'institution': institution_referer,
+                                    'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
+                                    'translation_status': translation_setting,
+                                    'diarization_status': diarization_setting,
+                                    'subtitles_status': subtitle_setting,
+                                    'transcription_model': transcription_model}]
 
-            #Prepare New Protocol Record
-            try:
-                institution_referer = st.context.headers[configs['header_names']['identity_provider']]
-            except:
-                institution_referer = '--'
-            # Prepare new protocol record
-            new_order_record = [{'upload_timestamp': time.time(),
-                                 'uploader_hash': mws_helpers.generate_hash(email_address_textbox),
-                                 'duration_seconds': duration_seconds,
-                                 'file_size': file_size,
-                                 'institution': institution_referer,
-                                 'language_code': mws_helpers.get_language_setting_index_or_code(language_setting),
-                                 'translation_status': translation_setting,
-                                 'diarization_status': diarization_setting,
-                                 'subtitles_status': subtitle_setting,
-                                 'transcription_model': transcription_model}]
+                # Register new record - transform it to a dataframe
+                new_record_df = pd.DataFrame(new_order_record)
+                # Check if protocol exists. If not, create it
+                mws_helpers.make_sure_protocols_exist()
+                # Read protocol
+                protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
+                # Concatanate protocol records
+                result = pd.concat([protocol, new_record_df])
+                # Save new state of the protocol
+                result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
 
-            # Register new record - transform it to a dataframe
-            new_record_df = pd.DataFrame(new_order_record)
-            # Check if protocol exists. If not, create it
-            mws_helpers.make_sure_protocols_exist()
-            # Read protocol
-            protocol = pd.read_csv(stats_protocol_file_path, encoding='Windows-1252')
-            # Concatanate protocol records
-            result = pd.concat([protocol, new_record_df])
-            # Save new state of the protocol
-            result.to_csv(stats_protocol_file_path, encoding='Windows-1252', index=False)
+                # Send notification to Admin to let him know a new file has been uploaded for Transcription
+                if configs['telegram']['use_telegram'] == True:
+                    count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
+                    count_in_progress, _ = mws_helpers.count_processing_jobs()
 
-            # Send notification to Admin to let him know a new file has been uploaded for Transcription
-            if configs['telegram']['use_telegram'] == True:
-                count_unprocessed, _ = mws_helpers.count_and_list_files(dir_orig_files_temps)
-                count_in_progress, _ = mws_helpers.count_processing_jobs()
+                    duration_minutes_for_message = (
+                        round(duration_seconds / 60, 2)
+                        if duration_seconds is not None
+                        else "unknown"
+                    )
 
-                duration_minutes_for_message = (
-                    round(duration_seconds / 60, 2)
-                    if duration_seconds is not None
-                    else "unknown"
-                )
+                    if summary_setting == "0":
+                        summary_language_setting = -1
 
-                if summary_setting == "0":
-                    summary_language_setting = -1
+                    mws_helpers.send_telegram_message(
+                        configs['telegram']['admin_chat_id'],
+                        f"NEW FILE HAS BEEN UPLOADED\n"
+                        f"Machine: {getpass.getuser()}\n"
+                        f"Institution: {institution_referer}\n"
+                        f"Duration in Minutes: {duration_minutes_for_message}\n"
+                        f"Language Code: {mws_helpers.get_language_setting_index_or_code(language_setting)}\n"
+                        f"Transcription Model: {transcription_model}\n"
+                        f"Diarization Status: {diarization_setting}\n"
+                        f"Translation Status: {translation_setting}\n"
+                        f"Subtitles Status: {subtitle_setting}\n"
+                        f"Summary Status: {summary_setting}\n"
+                        f"Summary Language Code: {mws_helpers.get_language_setting_index_or_code(summary_language_setting)}\n"
+                        f"Files Waiting: {count_unprocessed}\n"
+                        f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
+                    )
 
-                mws_helpers.send_telegram_message(
-                    configs['telegram']['admin_chat_id'],
-                    f"NEW FILE HAS BEEN UPLOADED\n"
-                    f"Machine: {getpass.getuser()}\n"
-                    f"Institution: {institution_referer}\n"
-                    f"Duration in Minutes: {duration_minutes_for_message}\n"
-                    f"Language Code: {mws_helpers.get_language_setting_index_or_code(language_setting)}\n"
-                    f"Transcription Model: {transcription_model}\n"
-                    f"Diarization Status: {diarization_setting}\n"
-                    f"Translation Status: {translation_setting}\n"
-                    f"Subtitles Status: {subtitle_setting}\n"
-                    f"Summary Status: {summary_setting}\n"
-                    f"Summary Language Code: {mws_helpers.get_language_setting_index_or_code(summary_language_setting)}\n"
-                    f"Files Waiting: {count_unprocessed}\n"
-                    f"Files in Progress: {count_in_progress}/{configs['features']['max_files_processed_simultaneously']}\n"
-                )
-
-            # Success message for user
+            # Both legitimate and shadow-banned users final success message
             st.success(f"{texts_from_config_file['upload_success_message_part_1']} {email_address_textbox}")
         else:
             print(st.error(texts_from_config_file['error_wrong_email'], icon="🚨"))
