@@ -1,5 +1,5 @@
 # IMPORT STANDARD MODULES
-import os, pathlib, time, re, getpass, json
+import os, pathlib, time, re, getpass, json, tempfile
 import streamlit as st, pandas as pd
 from PIL import Image
 from datetime import datetime
@@ -406,10 +406,6 @@ def main():
                     # Get bytes of uploaded file
                     uploaded_file_bytes = uploaded_file.getvalue()
 
-                    # Temporarily save audio file to gather info
-                    with open(obfuscated_file_fullpath_orig_postfix, mode='wb') as w:
-                        w.write(uploaded_file.getvalue())
-
                     sidecar_path = obfuscated_file_fullpath_orig_postfix.with_suffix('.json')
                     sidecar_data = {
                         "additional_info": additional_info,
@@ -418,21 +414,34 @@ def main():
                     with open(sidecar_path, 'w', encoding='utf-8') as f:
                         json.dump(sidecar_data, f, ensure_ascii=False, indent=2)
 
-                    # Gather file info
-                    media_info = mws_helpers.get_media_info(obfuscated_file_fullpath_orig_postfix)
-                    duration_seconds = media_info['duration_seconds']
-                    file_size = media_info['size_bytes']
-                    # Delete temporary file
-                    pathlib.Path.unlink(obfuscated_file_fullpath_orig_postfix)
+                    temp_fd, temp_media_fullpath = tempfile.mkstemp(suffix=file_extension_of_originally_uploaded_file)
+                    try:
+                        with os.fdopen(temp_fd, mode='wb') as w:
+                            w.write(uploaded_file_bytes)
+
+                        # Gather file info
+                        media_info = mws_helpers.get_media_info(temp_media_fullpath)
+                        duration_seconds = media_info['duration_seconds']
+                        file_size = media_info['size_bytes']
+                    finally:
+                        # Delete temporary file
+                        mws_helpers.safe_unlink(temp_media_fullpath, "temporary media info file")
 
                     # Write encrypted file
                     key = mws_helpers.get_encryption_key()
                     fernet = Fernet(key)
                     encrypted_bytes = fernet.encrypt(uploaded_file_bytes)
 
-                    with open(obfuscated_file_fullpath_orig_postfix,
-                            "wb") as enc_file:  # this filename is used to transfer the original file extension to mws_whisper.py
-                        enc_file.write(encrypted_bytes)
+                    partial_enc_file_fullpath = obfuscated_file_fullpath_orig_postfix.with_name(
+                        obfuscated_file_fullpath_orig_postfix.name + '.part')
+                    try:
+                        with open(partial_enc_file_fullpath, "wb") as enc_file:
+                            enc_file.write(encrypted_bytes)
+                        os.replace(partial_enc_file_fullpath, obfuscated_file_fullpath_orig_postfix)
+                    except Exception:
+                        mws_helpers.safe_unlink(partial_enc_file_fullpath, "partial encrypted file")
+                        mws_helpers.safe_unlink(sidecar_path, "Sidecar file")
+                        raise
 
                     # Prepare New Protocol Record
                     try:

@@ -346,7 +346,8 @@ def cleanup_processing_markers():
 def count_and_list_files(folder_path):
     files = []
     files_count = 0
-    excluded_extensions = {'.json', '.gitignore'}
+    # .part files are still being written by mws_page.py
+    excluded_extensions = {'.json', '.gitignore', '.part'}
     # Count files in progress
     for path in os.listdir(folder_path):
         file_path = os.path.join(folder_path, path)
