@@ -730,7 +730,6 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
     file_path = Path(obfuscated_encrypted_fullpath)
     sidecar_path = file_path.with_suffix('.json')
     logger.debug('Processing file...')
-    obfuscated_moved_fullpath = None
     obfuscated_decrypted_fullpath = None
     obfuscated_standardized_fullpath = None
     obfuscated_filename_stem = None
@@ -752,8 +751,6 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         # Move original file to the conversion folder
         os.replace(obfuscated_encrypted_fullpath, new_location_fullpath)
         obfuscated_encrypted_fullpath = new_location_fullpath
-        # Remember moved file so it is also cleaned up if decryption fails
-        obfuscated_moved_fullpath = new_location_fullpath
 
         obfuscated_filename_stem = pathlib.Path(obfuscated_encrypted_fullpath).stem
 
@@ -804,7 +801,6 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
         # Delete decrypted original only after successful conversion
         mws_helpers.safe_unlink(obfuscated_decrypted_fullpath, "decrypted original file")
         obfuscated_decrypted_fullpath = None
-        obfuscated_moved_fullpath = None
 
         # Get starting time
         loop_start_time = time.time()
@@ -1051,7 +1047,6 @@ def process_file(obfuscated_encrypted_fullpath, processing_marker_fullpath=None)
             logger.error(f"Could not send error notification email: {error_mail_exception}", exc_info=True)
 
         # Cleanup files that may have remained after an error
-        mws_helpers.safe_unlink(obfuscated_moved_fullpath, "encrypted original file")
         mws_helpers.safe_unlink(obfuscated_decrypted_fullpath, "decrypted original file")
         mws_helpers.safe_unlink(obfuscated_standardized_fullpath, "standardized Opus file")
 
